@@ -1,0 +1,25 @@
+{
+	"name": "ai-kanban-board",
+	"version": "0.0.0",
+	"private": true,
+	"description": "AI Kanban Board monorepo",
+	"type": "module",
+	"scripts": {
+		"build": "turbo run build",
+		"check": "turbo run check",
+		"check:fix": "turbo run check:fix",
+		"check-types": "turbo run check-types",
+		"dev": "turbo run dev",
+		"root-check": "biome check package.json turbo.json biome.json",
+		"root-check-fix": "biome check --write package.json turbo.json biome.json",
+		"test": "turbo run test"
+	},
+	"engines": {
+		"node": ">=24.15.0 <25"
+	},
+	"packageManager": "pnpm@11.24.0",
+	"devDependencies": {
+		"@biomejs/biome": "2.5.11",
+		"turbo": "2.10.12"
+	}
+}

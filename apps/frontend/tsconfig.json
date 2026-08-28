@@ -1,0 +1,12 @@
+{
+	"include": ["**/*.ts", "**/*.tsx"],
+	"exclude": ["dist", ".output", "node_modules"],
+	"extends": "@repo/typescript-config/browser.json",
+	"compilerOptions": {
+		"paths": {
+			"#/*": ["./src/*"],
+			"@/*": ["./src/*"]
+		},
+		"types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"]
+	}
+}

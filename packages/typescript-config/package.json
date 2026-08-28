@@ -1,0 +1,17 @@
+{
+	"name": "@repo/typescript-config",
+	"version": "0.0.0",
+	"private": true,
+	"files": [
+		"*.json"
+	],
+	"exports": {
+		"./base.json": "./base.json",
+		"./browser.json": "./browser.json",
+		"./nest.json": "./nest.json"
+	},
+	"scripts": {
+		"check": "biome check .",
+		"check:fix": "biome check --write ."
+	}
+}

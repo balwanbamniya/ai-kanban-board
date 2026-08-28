@@ -1,0 +1,36 @@
+{
+	"$schema": "https://turborepo.dev/schema.json",
+	"tasks": {
+		"//#root-check": {
+			"outputs": []
+		},
+		"//#root-check-fix": {
+			"cache": false
+		},
+		"transit": {
+			"dependsOn": ["^transit"]
+		},
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**"]
+		},
+		"check": {
+			"dependsOn": ["transit", "//#root-check"]
+		},
+		"check:fix": {
+			"dependsOn": ["//#root-check-fix"],
+			"cache": false
+		},
+		"check-types": {
+			"dependsOn": ["transit"]
+		},
+		"test": {
+			"dependsOn": ["transit"],
+			"outputs": []
+		},
+		"dev": {
+			"persistent": true,
+			"cache": false
+		}
+	}
+}

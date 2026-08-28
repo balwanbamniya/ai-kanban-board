@@ -1,0 +1,43 @@
+{
+	"name": "@repo/frontend",
+	"version": "0.0.0",
+	"private": true,
+	"description": "TanStack Start frontend for AI Kanban Board",
+	"type": "module",
+	"imports": {
+		"#/*": "./src/*"
+	},
+	"scripts": {
+		"build": "vite build",
+		"check": "biome check .",
+		"check:fix": "biome check --write .",
+		"check-types": "tsc --noEmit",
+		"dev": "vite dev --port 3000",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@tanstack/react-devtools": "0.10.12",
+		"@tanstack/react-router": "1.170.32",
+		"@tanstack/react-router-devtools": "1.167.1",
+		"@tanstack/react-start": "1.168.49",
+		"react": "19.2.8",
+		"react-dom": "19.2.8"
+	},
+	"devDependencies": {
+		"@repo/typescript-config": "workspace:*",
+		"@tailwindcss/vite": "4.3.3",
+		"@tanstack/devtools-vite": "0.8.5",
+		"@testing-library/dom": "10.4.1",
+		"@testing-library/jest-dom": "7.0.1",
+		"@testing-library/react": "16.3.3",
+		"@types/node": "catalog:",
+		"@types/react": "19.2.18",
+		"@types/react-dom": "19.2.5",
+		"@vitejs/plugin-react": "6.1.1",
+		"jsdom": "30.0.1",
+		"tailwindcss": "4.3.3",
+		"typescript": "catalog:",
+		"vite": "8.2.2",
+		"vitest": "catalog:"
+	}
+}
