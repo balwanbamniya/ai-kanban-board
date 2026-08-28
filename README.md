@@ -25,10 +25,19 @@ pnpm dev
 ```
 
 The frontend runs at <http://localhost:3000> and the API runs at
-<http://localhost:3001>. The API exposes `GET /health` for service health checks.
+<http://localhost:3001>. The API preserves `GET /health` for compatibility and
+exposes `GET /api/v1/health/live` and `GET /api/v1/health/ready` for orchestrator
+health checks. Interactive API docs are available at
+<http://localhost:3001/docs> outside production.
 
-The API reads `PORT` from the process environment and defaults to `3001`. No
-environment files or secrets are required by the initial foundation.
+Copy `apps/api/.env.example` to `apps/api/.env` to customize validated API
+configuration. The checked-in defaults run without external secrets.
+
+Local PostgreSQL and Redis services can be started with:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d
+```
 
 ## Commands
 

@@ -3,8 +3,10 @@ packages:
   - "packages/*"
 
 allowBuilds:
+  '@scarf/scarf': false
   esbuild: true
   lightningcss: true
+  protobufjs: false
 
 catalog:
   "@types/node": 24.13.3
@@ -29,3 +31,4 @@ minimumReleaseAgeExclude:
   - '@nestjs/testing@12.0.1'
   - '@testing-library/react@16.3.3'
   - '@vitejs/plugin-react@6.1.1'
+  - '@nestjs/swagger@12.0.1'

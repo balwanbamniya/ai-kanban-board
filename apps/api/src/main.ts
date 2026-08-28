@@ -1,11 +1,26 @@
-import { NestFactory } from "@nestjs/core";
-import { AppModule } from "./app.module.js";
+import { fileURLToPath } from "node:url";
+import { config as loadEnvironment } from "dotenv";
+import { readTelemetryEnvironment } from "./config/env.validation.js";
+import {
+	shutdownTelemetry,
+	startTelemetry,
+} from "./observability/telemetry.js";
 
-async function bootstrap(): Promise<void> {
-	const app = await NestFactory.create(AppModule);
-	const port = Number(process.env.PORT ?? 3001);
+loadEnvironment({
+	path: fileURLToPath(new URL("../.env", import.meta.url)),
+	quiet: true,
+});
 
-	await app.listen(port);
+try {
+	const telemetryConfig = readTelemetryEnvironment(process.env);
+	startTelemetry({
+		enabled: telemetryConfig.OTEL_ENABLED,
+		serviceName: telemetryConfig.OTEL_SERVICE_NAME,
+	});
+
+	const { bootstrap } = await import("./server.js");
+	await bootstrap();
+} catch (error) {
+	await shutdownTelemetry();
+	throw error;
 }
-
-void bootstrap();
