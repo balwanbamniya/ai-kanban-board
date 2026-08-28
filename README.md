@@ -21,6 +21,10 @@ the declared pnpm version with `corepack enable`.
 
 ```bash
 pnpm install
+cp apps/api/.env.example apps/api/.env
+docker compose -f infra/docker/docker-compose.yml up -d
+pnpm --filter @repo/api db:migrate:deploy
+pnpm --filter @repo/api db:seed
 pnpm dev
 ```
 
@@ -30,31 +34,43 @@ exposes `GET /api/v1/health/live` and `GET /api/v1/health/ready` for orchestrato
 health checks. Interactive API docs are available at
 <http://localhost:3001/docs> outside production.
 
-Copy `apps/api/.env.example` to `apps/api/.env` to customize validated API
-configuration. The checked-in defaults run without external secrets.
-
-Local PostgreSQL and Redis services can be started with:
-
-```bash
-docker compose -f infra/docker/docker-compose.yml up -d
-```
+API configuration, including the PostgreSQL connection and pool limits, is
+validated before Nest finishes starting. The local Compose services bind only
+to the loopback interface.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `pnpm dev` | Start all application development servers |
+| `pnpm generate` | Generate workspace-owned clients, including Prisma Client |
 | `pnpm build` | Build all deployable applications |
 | `pnpm check` | Check formatting and lint rules |
 | `pnpm check:fix` | Apply safe formatting and lint fixes |
 | `pnpm check-types` | Type-check every TypeScript workspace |
 | `pnpm test` | Run all workspace smoke tests |
+| `pnpm test:integration` | Run integration tests against the configured PostgreSQL database |
+
+Prisma schema, migrations, and seed data are owned by `apps/api`. Useful
+database commands are package-scoped:
+
+```bash
+pnpm --filter @repo/api db:validate
+pnpm --filter @repo/api db:migrate:dev --name <migration-name>
+pnpm --filter @repo/api db:migrate:deploy
+pnpm --filter @repo/api db:seed
+pnpm --filter @repo/api db:studio
+```
+
+Normal tests mock database access. To run the integration suite locally, start
+PostgreSQL, deploy the migrations, seed the fixtures, and then run
+`pnpm test:integration`.
 
 ## Workspace
 
 ```text
 apps/
-  api/                 NestJS API
+  api/                 NestJS API, Prisma schema, and migrations
   frontend/            TanStack Start frontend
 packages/
   typescript-config/   Shared TypeScript configurations

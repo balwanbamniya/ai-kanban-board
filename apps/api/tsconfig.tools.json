@@ -1,0 +1,9 @@
+{
+	"extends": "@repo/typescript-config/nest.json",
+	"compilerOptions": {
+		"incremental": false,
+		"noEmit": true
+	},
+	"include": ["prisma.config.ts", "prisma/**/*.ts", "vitest*.ts"],
+	"exclude": ["node_modules"]
+}

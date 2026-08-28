@@ -10,9 +10,11 @@
 		"check:fix": "turbo run check:fix",
 		"check-types": "turbo run check-types",
 		"dev": "turbo run dev",
+		"generate": "turbo run generate",
 		"root-check": "biome check package.json turbo.json biome.json",
 		"root-check-fix": "biome check --write package.json turbo.json biome.json",
-		"test": "turbo run test"
+		"test": "turbo run test",
+		"test:integration": "turbo run test:integration"
 	},
 	"engines": {
 		"node": ">=24.15.0 <25"

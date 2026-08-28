@@ -16,6 +16,14 @@ const httpOriginSchema = z.url().refine(
 	{ message: "must use the http or https protocol" },
 );
 
+const postgresUrlSchema = z.url().refine(
+	(value) => {
+		const protocol = new URL(value).protocol;
+		return protocol === "postgres:" || protocol === "postgresql:";
+	},
+	{ message: "must use the postgres or postgresql protocol" },
+);
+
 const environmentSchema = telemetryEnvironmentSchema.extend({
 	NODE_ENV: z
 		.enum(["development", "test", "production"])
@@ -42,6 +50,14 @@ const environmentSchema = telemetryEnvironmentSchema.extend({
 				.filter(Boolean),
 		)
 		.pipe(z.array(httpOriginSchema).min(1)),
+	DATABASE_URL: postgresUrlSchema,
+	DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+	DATABASE_CONNECTION_TIMEOUT_MS: z.coerce
+		.number()
+		.int()
+		.min(100)
+		.max(60_000)
+		.default(5000),
 	LOG_LEVEL: z
 		.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
 		.default("info"),

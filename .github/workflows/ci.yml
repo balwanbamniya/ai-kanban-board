@@ -19,6 +19,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    env:
+      DATABASE_URL: postgresql://ai_kanban:ai_kanban@localhost:5432/ai_kanban?schema=public
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ai_kanban
+          POSTGRES_PASSWORD: ai_kanban
+          POSTGRES_USER: ai_kanban
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ai_kanban -d ai_kanban"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -34,6 +52,24 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Validate database schema
+        run: pnpm --filter @repo/api db:validate
+
+      - name: Generate database client
+        run: pnpm generate
+
+      - name: Apply database migrations
+        run: pnpm --filter @repo/api db:migrate:deploy
+
+      - name: Seed database
+        run: pnpm --filter @repo/api db:seed
+
+      - name: Verify idempotent database seed
+        run: pnpm --filter @repo/api db:seed
+
+      - name: Run database integration tests
+        run: pnpm test:integration
 
       - name: Check formatting and linting
         run: pnpm check

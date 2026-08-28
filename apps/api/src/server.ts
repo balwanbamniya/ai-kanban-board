@@ -9,8 +9,7 @@ import {
 	createHttpLogger,
 } from "./observability/http-logger.js";
 
-export async function createApplication(): Promise<INestApplication> {
-	const app = await NestFactory.create(AppModule, { bufferLogs: true });
+export function configureApplication(app: INestApplication): INestApplication {
 	const config = app.get(AppConfigService);
 
 	app.useLogger(
@@ -48,6 +47,11 @@ export async function createApplication(): Promise<INestApplication> {
 	}
 
 	return app;
+}
+
+export async function createApplication(): Promise<INestApplication> {
+	const app = await NestFactory.create(AppModule, { bufferLogs: true });
+	return configureApplication(app);
 }
 
 export async function bootstrap(): Promise<void> {

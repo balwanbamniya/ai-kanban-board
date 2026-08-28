@@ -41,3 +41,6 @@ yarn-error.log*
 .DS_Store
 *.pem
 __unconfig*
+
+# Generated Prisma client
+apps/api/src/generated/prisma/

@@ -12,6 +12,18 @@ export class AppConfigService {
 		return this.config.getOrThrow("CORS_ORIGINS");
 	}
 
+	get databaseConnectionTimeoutMs(): number {
+		return this.config.getOrThrow("DATABASE_CONNECTION_TIMEOUT_MS");
+	}
+
+	get databasePoolMax(): number {
+		return this.config.getOrThrow("DATABASE_POOL_MAX");
+	}
+
+	get databaseUrl(): string {
+		return this.config.getOrThrow("DATABASE_URL");
+	}
+
 	get environment(): Environment["NODE_ENV"] {
 		return this.config.getOrThrow("NODE_ENV");
 	}

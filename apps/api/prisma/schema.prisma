@@ -1,0 +1,254 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  runtime      = "nodejs"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PlatformRole {
+  USER
+  PLATFORM_ADMIN
+}
+
+enum BoardRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  EXPIRED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum AiOperationKind {
+  TASK_GENERATION
+  TASK_BREAKDOWN
+  BOARD_SUMMARY
+}
+
+enum AiRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id             String       @id @default(uuid()) @db.Uuid
+  externalAuthId String       @unique @map("external_auth_id")
+  email          String       @unique
+  name           String
+  avatarUrl      String?      @map("avatar_url")
+  platformRole   PlatformRole @default(USER) @map("platform_role")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  ownedBoards         Board[]           @relation("BoardOwner")
+  memberships         BoardMember[]
+  membershipsInvited  BoardMember[]     @relation("BoardMemberInviter")
+  invitationsSent     BoardInvitation[] @relation("InvitationInviter")
+  invitationsAccepted BoardInvitation[] @relation("InvitationAccepter")
+  assignedTasks       Task[]            @relation("TaskAssignee")
+  createdTasks        Task[]            @relation("TaskCreator")
+  activities          Activity[]        @relation("ActivityActor")
+  aiRuns              AiRun[]           @relation("AiRunActor")
+
+  @@map("users")
+}
+
+model Board {
+  id          String    @id @default(uuid()) @db.Uuid
+  ownerId     String    @map("owner_id") @db.Uuid
+  title       String
+  description String?
+  color       String    @default("#6366f1")
+  version     Int       @default(1)
+  archivedAt  DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner       User              @relation("BoardOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members     BoardMember[]
+  invitations BoardInvitation[]
+  columns     Column[]
+  activities  Activity[]
+  aiRuns      AiRun[]
+
+  @@index([ownerId])
+  @@index([archivedAt])
+  @@map("boards")
+}
+
+model BoardMember {
+  boardId     String    @map("board_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  role        BoardRole @default(MEMBER)
+  joinedAt    DateTime  @default(now()) @map("joined_at") @db.Timestamptz(6)
+  invitedById String?   @map("invited_by_id") @db.Uuid
+
+  board     Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("BoardMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@id([boardId, userId])
+  @@index([userId])
+  @@index([invitedById])
+  @@map("board_members")
+}
+
+model BoardInvitation {
+  id            String           @id @default(uuid()) @db.Uuid
+  boardId       String           @map("board_id") @db.Uuid
+  email         String
+  requestedRole BoardRole        @default(MEMBER) @map("requested_role")
+  tokenHash     String           @unique @map("token_hash")
+  status        InvitationStatus @default(PENDING)
+  expiresAt     DateTime         @map("expires_at") @db.Timestamptz(6)
+  invitedById   String           @map("invited_by_id") @db.Uuid
+  acceptedById  String?          @map("accepted_by_id") @db.Uuid
+  acceptedAt    DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board      Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  invitedBy  User  @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  acceptedBy User? @relation("InvitationAccepter", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([boardId, status])
+  @@index([email, status])
+  @@index([expiresAt])
+  @@map("board_invitations")
+}
+
+model Column {
+  id        String   @id @default(uuid()) @db.Uuid
+  boardId   String   @map("board_id") @db.Uuid
+  title     String
+  sortKey   String   @map("sort_key")
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@unique([id, boardId])
+  @@unique([boardId, sortKey])
+  @@map("columns")
+}
+
+model Task {
+  id           String       @id @default(uuid()) @db.Uuid
+  boardId      String       @map("board_id") @db.Uuid
+  columnId     String       @map("column_id") @db.Uuid
+  title        String
+  description  String?
+  priority     TaskPriority @default(MEDIUM)
+  dueDate      DateTime?    @map("due_date") @db.Timestamptz(6)
+  assigneeId   String?      @map("assignee_id") @db.Uuid
+  creatorId    String?      @map("creator_id") @db.Uuid
+  parentTaskId String?      @map("parent_task_id") @db.Uuid
+  sortKey      String       @map("sort_key")
+  version      Int          @default(1)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  column     Column @relation(fields: [columnId, boardId], references: [id, boardId], onDelete: Cascade)
+  assignee   User?  @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  creator    User?  @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+  parentTask Task?  @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  subtasks   Task[] @relation("TaskHierarchy")
+
+  @@unique([columnId, sortKey])
+  @@index([boardId, sortKey])
+  @@index([boardId, assigneeId])
+  @@index([parentTaskId])
+  @@map("tasks")
+}
+
+model Activity {
+  id        String   @id @default(uuid()) @db.Uuid
+  boardId   String   @map("board_id") @db.Uuid
+  actorId   String?  @map("actor_id") @db.Uuid
+  eventName String   @map("event_name")
+  message   String
+  payload   Json?    @db.JsonB
+  requestId String?  @map("request_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  actor User? @relation("ActivityActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([boardId, createdAt(sort: Desc)])
+  @@index([requestId])
+  @@map("activities")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  aggregateType String       @map("aggregate_type")
+  aggregateId   String       @map("aggregate_id") @db.Uuid
+  eventName     String       @map("event_name")
+  payload       Json         @db.JsonB
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  lastError     String?      @map("last_error")
+  occurredAt    DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(6)
+  processedAt   DateTime?    @map("processed_at") @db.Timestamptz(6)
+  processingAt  DateTime?    @map("processing_at") @db.Timestamptz(6)
+
+  @@index([status, occurredAt])
+  @@index([aggregateType, aggregateId])
+  @@map("outbox_events")
+}
+
+model AiRun {
+  id             String          @id @default(uuid()) @db.Uuid
+  boardId        String          @map("board_id") @db.Uuid
+  actorId        String?         @map("actor_id") @db.Uuid
+  operationKind  AiOperationKind @map("operation_kind")
+  provider       String
+  model          String
+  promptVersion  String          @map("prompt_version")
+  status         AiRunStatus     @default(QUEUED)
+  input          Json            @db.JsonB
+  output         Json?           @db.JsonB
+  usage          Json?           @db.JsonB
+  latencyMs      Int?            @map("latency_ms")
+  idempotencyKey String          @map("idempotency_key")
+  errorMessage   String?         @map("error_message")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt      DateTime?       @map("started_at") @db.Timestamptz(6)
+  completedAt    DateTime?       @map("completed_at") @db.Timestamptz(6)
+  updatedAt      DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  actor User? @relation("AiRunActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@unique([boardId, idempotencyKey])
+  @@index([boardId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@map("ai_runs")
+}

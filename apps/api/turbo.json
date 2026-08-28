@@ -1,8 +1,25 @@
 {
 	"extends": ["//"],
 	"tasks": {
+		"build": {
+			"dependsOn": ["$TURBO_EXTENDS$", "generate"]
+		},
 		"check-types": {
+			"dependsOn": ["$TURBO_EXTENDS$", "generate"],
 			"outputs": ["dist/tsconfig.tsbuildinfo"]
+		},
+		"dev": {
+			"dependsOn": ["$TURBO_EXTENDS$", "generate"]
+		},
+		"generate": {
+			"outputs": ["src/generated/prisma/**"]
+		},
+		"test": {
+			"dependsOn": ["$TURBO_EXTENDS$", "generate"]
+		},
+		"test:integration": {
+			"dependsOn": ["generate"],
+			"passThroughEnv": ["DATABASE_URL"]
 		}
 	}
 }

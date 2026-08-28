@@ -10,6 +10,7 @@
 		"transit": {
 			"dependsOn": ["^transit"]
 		},
+		"generate": {},
 		"build": {
 			"dependsOn": ["^build"],
 			"outputs": ["dist/**"]
@@ -26,6 +27,10 @@
 		},
 		"test": {
 			"dependsOn": ["transit"],
+			"outputs": []
+		},
+		"test:integration": {
+			"cache": false,
 			"outputs": []
 		},
 		"dev": {

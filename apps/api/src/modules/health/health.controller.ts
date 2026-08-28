@@ -1,5 +1,10 @@
 import { Controller, Get, HttpCode, HttpStatus, Inject } from "@nestjs/common";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+	ApiOkResponse,
+	ApiOperation,
+	ApiServiceUnavailableResponse,
+	ApiTags,
+} from "@nestjs/swagger";
 import { HealthService } from "./health.service.js";
 
 @ApiTags("health")
@@ -26,9 +31,13 @@ export class HealthController {
 	@Get("ready")
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({
-		summary: "Report whether the API is ready to receive traffic.",
+		summary: "Report whether the API and database are ready for traffic.",
 	})
-	readiness(): { status: "ok" } {
+	@ApiOkResponse({ description: "The API and database are ready." })
+	@ApiServiceUnavailableResponse({
+		description: "The database is unavailable.",
+	})
+	readiness(): Promise<{ status: "ok" }> {
 		return this.healthService.readiness();
 	}
 }
