@@ -1,13 +1,21 @@
 import { randomUUID } from "node:crypto";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { BoardRole } from "../generated/prisma/enums.js";
+import { BoardAccessService } from "../modules/access-control/application/board-access.service.js";
+import { BoardAuthorizationPolicy } from "../modules/access-control/application/board-authorization.policy.js";
+import { BoardPermission } from "../modules/access-control/domain/board-permission.enum.js";
+import { BoardRole as AccessRole } from "../modules/access-control/domain/board-role.enum.js";
 import { UserSyncService } from "../modules/users/application/user-sync.service.js";
 import { UserIdentityConflictError } from "../modules/users/domain/user.errors.js";
 import { createPrismaAdapter } from "./prisma-client.js";
 
 const seedBoardId = "10000000-0000-4000-8000-000000000001";
 const seedOwnerId = "00000000-0000-4000-8000-000000000001";
+const seedAdminId = "00000000-0000-4000-8000-000000000002";
+const seedMemberId = "00000000-0000-4000-8000-000000000003";
+const seedViewerId = "00000000-0000-4000-8000-000000000004";
 
 describe("database foundation", () => {
 	let prisma: PrismaClient;
@@ -97,6 +105,46 @@ describe("database foundation", () => {
 				data: { version: 0 },
 			}),
 		).rejects.toThrow();
+	});
+
+	it("authorizes every seeded board role from persisted ownership and memberships", async () => {
+		const access = new BoardAccessService(
+			prisma as never,
+			new BoardAuthorizationPolicy(),
+		);
+
+		await expect(
+			access.assertPermissions(seedOwnerId, seedBoardId, [
+				BoardPermission.BOARD_DELETE,
+				BoardPermission.BOARD_TRANSFER_OWNERSHIP,
+			]),
+		).resolves.toMatchObject({ role: AccessRole.OWNER });
+		await expect(
+			access.assertPermissions(seedAdminId, seedBoardId, [
+				BoardPermission.BOARD_UPDATE,
+				BoardPermission.COLUMN_DELETE,
+			]),
+		).resolves.toMatchObject({ role: AccessRole.ADMIN });
+		await expect(
+			access.assertPermissions(seedMemberId, seedBoardId, [
+				BoardPermission.TASK_UPDATE,
+				BoardPermission.TASK_MOVE,
+			]),
+		).resolves.toMatchObject({ role: AccessRole.MEMBER });
+		await expect(
+			access.assertPermissions(seedViewerId, seedBoardId, [
+				BoardPermission.BOARD_READ,
+			]),
+		).resolves.toMatchObject({ role: AccessRole.VIEWER });
+
+		await expect(
+			access.assertPermissions(seedMemberId, seedBoardId, [
+				BoardPermission.COLUMN_UPDATE,
+			]),
+		).rejects.toBeInstanceOf(ForbiddenException);
+		await expect(
+			access.getContext(randomUUID(), seedBoardId),
+		).rejects.toBeInstanceOf(NotFoundException);
 	});
 
 	it("orders Clerk profile events, soft-deletes users, and frees their email", async () => {

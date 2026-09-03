@@ -50,6 +50,12 @@ record, while the first authenticated request can provision a missing record if
 the creation webhook is delayed. The API stores application roles locally and
 never derives them from Clerk profile data.
 
+Board-specific authorization fails closed on decorated routes. Board routes use
+`CheckBoardPermissions` to install the policy guard, load an immutable access
+context, and enforce the role-permission matrix; target-sensitive membership
+operations are checked by `BoardAccessService`. `Board.ownerId` is the sole
+ownership source, so owners must not also be inserted as board members.
+
 ## Commands
 
 | Command | Purpose |
