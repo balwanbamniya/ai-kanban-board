@@ -14,6 +14,7 @@ describe("environment validation", () => {
 		CLERK_SECRET_KEY: "sk_test_example",
 		CLERK_WEBHOOK_SIGNING_SECRET: "whsec_example",
 		DATABASE_URL: databaseUrl,
+		REDIS_URL: "redis://localhost:6379",
 	};
 
 	it("applies safe defaults and normalizes list and path values", () => {
@@ -39,6 +40,7 @@ describe("environment validation", () => {
 			DATABASE_CONNECTION_TIMEOUT_MS: 5000,
 			DATABASE_POOL_MAX: 10,
 			DATABASE_URL: databaseUrl,
+			REDIS_URL: "redis://localhost:6379",
 			LOG_LEVEL: "info",
 			NODE_ENV: "development",
 			OTEL_ENABLED: false,
@@ -52,6 +54,7 @@ describe("environment validation", () => {
 		"CLERK_JWT_KEY",
 		"CLERK_WEBHOOK_SIGNING_SECRET",
 		"CLERK_AUTHORIZED_PARTIES",
+		"REDIS_URL",
 	])("requires %s", (key) => {
 		const environment: Record<string, unknown> = { ...requiredEnvironment };
 		delete environment[key];
@@ -78,6 +81,10 @@ describe("environment validation", () => {
 		[
 			{ ...requiredEnvironment, DATABASE_URL: "https://example.com/database" },
 			"DATABASE_URL",
+		],
+		[
+			{ ...requiredEnvironment, REDIS_URL: "https://example.com/redis" },
+			"REDIS_URL",
 		],
 		[{ ...requiredEnvironment, DATABASE_POOL_MAX: "101" }, "DATABASE_POOL_MAX"],
 	])("rejects invalid service configuration", (environment, key) => {

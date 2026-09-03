@@ -16,5 +16,6 @@ import { ClerkWebhookController } from "./presentation/clerk-webhook.controller.
 		AuthenticationService,
 		{ provide: APP_GUARD, useClass: AuthGuard },
 	],
+	exports: [AuthenticationService],
 })
 export class IdentityModule {}

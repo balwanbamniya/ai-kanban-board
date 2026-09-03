@@ -53,6 +53,7 @@ describe("service foundation", () => {
 		vi.stubEnv("OTEL_ENABLED", "false");
 		vi.stubEnv("OTEL_SERVICE_NAME", "ai-kanban-api");
 		vi.stubEnv("PORT", "3001");
+		vi.stubEnv("REDIS_URL", "redis://localhost:6379");
 
 		const { AppModule } = await import("./app.module.js");
 		const { PrismaService } = await import("./database/prisma.service.js");

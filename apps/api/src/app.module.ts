@@ -7,6 +7,7 @@ import { BoardsModule } from "./modules/boards/boards.module.js";
 import { ColumnsModule } from "./modules/columns/columns.module.js";
 import { HealthModule } from "./modules/health/health.module.js";
 import { IdentityModule } from "./modules/identity/identity.module.js";
+import { RealtimeModule } from "./modules/realtime/realtime.module.js";
 import { TasksModule } from "./modules/tasks/tasks.module.js";
 import { TelemetryLifecycleService } from "./observability/telemetry-lifecycle.service.js";
 
@@ -20,6 +21,7 @@ import { TelemetryLifecycleService } from "./observability/telemetry-lifecycle.s
 		ColumnsModule,
 		HealthModule,
 		IdentityModule,
+		RealtimeModule,
 		TasksModule,
 	],
 	providers: [TelemetryLifecycleService],

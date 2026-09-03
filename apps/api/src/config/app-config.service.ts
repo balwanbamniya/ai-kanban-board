@@ -60,6 +60,10 @@ export class AppConfigService {
 		return this.config.getOrThrow("PORT");
 	}
 
+	get redisUrl(): string {
+		return this.config.getOrThrow("REDIS_URL");
+	}
+
 	get swaggerEnabled(): boolean {
 		return this.environment !== "production";
 	}

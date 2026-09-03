@@ -24,6 +24,14 @@ const postgresUrlSchema = z.url().refine(
 	{ message: "must use the postgres or postgresql protocol" },
 );
 
+const redisUrlSchema = z.url().refine(
+	(value) => {
+		const protocol = new URL(value).protocol;
+		return protocol === "redis:" || protocol === "rediss:";
+	},
+	{ message: "must use the redis or rediss protocol" },
+);
+
 const commaSeparatedListSchema = z.string().transform((value) =>
 	value
 		.split(",")
@@ -65,6 +73,7 @@ const environmentSchema = telemetryEnvironmentSchema.extend({
 		.min(100)
 		.max(60_000)
 		.default(5000),
+	REDIS_URL: redisUrlSchema,
 
 	CLERK_SECRET_KEY: z.string().trim().min(1),
 	CLERK_JWT_KEY: z

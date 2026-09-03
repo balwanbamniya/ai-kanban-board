@@ -8,6 +8,8 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
 import { AppModule } from "./app.module.js";
 import { AppConfigService } from "./config/app-config.service.js";
+import { RealtimeRedisService } from "./modules/realtime/realtime-redis.service.js";
+import { RedisIoAdapter } from "./modules/realtime/redis-io.adapter.js";
 import {
 	createApplicationLogger,
 	createHttpLogger,
@@ -66,7 +68,13 @@ export async function createApplication(): Promise<INestApplication> {
 		bufferLogs: true,
 		rawBody: true,
 	});
-	return configureApplication(app);
+	configureApplication(app);
+	const redis = app.get(RealtimeRedisService);
+	await redis.connect();
+	app.useWebSocketAdapter(
+		new RedisIoAdapter(app, app.get(AppConfigService), redis),
+	);
+	return app;
 }
 
 export async function bootstrap(): Promise<void> {
