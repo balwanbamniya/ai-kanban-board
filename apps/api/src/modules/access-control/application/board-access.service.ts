@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Inject,
 	Injectable,
@@ -16,6 +17,13 @@ import {
 import { BoardRole } from "../domain/board-role.enum.js";
 import { BoardAuthorizationPolicy } from "./board-authorization.policy.js";
 
+const archivedBoardPermissions = new Set<BoardPermission>([
+	BoardPermission.ACTIVITY_READ,
+	BoardPermission.BOARD_READ,
+	BoardPermission.BOARD_RESTORE,
+	BoardPermission.INVITATION_READ,
+]);
+
 @Injectable()
 export class BoardAccessService {
 	constructor(
@@ -28,16 +36,15 @@ export class BoardAccessService {
 		userId: string,
 		boardId: string,
 	): Promise<BoardAccessContext> {
-		this.assertBoardId(boardId);
+		this.assertUuid(boardId, "Board ID");
 
-		// Filtering by accessibility prevents callers from using authorization
-		// failures to discover boards they cannot access.
 		const board = await this.prisma.board.findFirst({
 			where: {
 				id: boardId,
 				OR: [{ ownerId: userId }, { members: { some: { userId } } }],
 			},
 			select: {
+				archivedAt: true,
 				id: true,
 				ownerId: true,
 				members: {
@@ -55,14 +62,13 @@ export class BoardAccessService {
 		const role =
 			board.ownerId === userId
 				? BoardRole.OWNER
-				: this.toBoardRole(board.members[0]?.role);
+				: this.toOptionalBoardRole(board.members[0]?.role);
 		if (!role) {
-			// The accessibility filter should make this state unreachable. Failing
-			// closed protects the route if the query is changed incorrectly later.
 			throw new ForbiddenException("You do not have access to this board.");
 		}
 
 		return {
+			archivedAt: board.archivedAt,
 			boardId: board.id,
 			ownerId: board.ownerId,
 			role,
@@ -75,105 +81,80 @@ export class BoardAccessService {
 		boardId: string,
 		permissions: BoardPermissionRequirement,
 	): Promise<BoardAccessContext> {
-		const context = await this.getContext(userId, boardId);
+		return this.assertContextPermissions(
+			await this.getContext(userId, boardId),
+			permissions,
+		);
+	}
+
+	assertContextPermissions(
+		context: BoardAccessContext,
+		permissions: BoardPermissionRequirement,
+	): BoardAccessContext {
 		if (!this.authorization.allowsEvery(context.role, permissions)) {
 			throw new ForbiddenException(
 				"You do not have permission to perform this action.",
 			);
 		}
+		if (
+			context.archivedAt &&
+			permissions.some(
+				(permission) => !archivedBoardPermissions.has(permission),
+			)
+		) {
+			throw new ConflictException("Archived boards are read-only.");
+		}
 		return context;
 	}
 
-	/** Applies the target-sensitive constraints that a role matrix cannot express. */
-	async assertCanInviteMember(
-		actorUserId: string,
-		boardId: string,
+	assertCanInviteMember(
+		context: BoardAccessContext,
 		requestedRole: BoardRole,
-	): Promise<BoardAccessContext> {
-		const actor = await this.assertPermissions(actorUserId, boardId, [
-			BoardPermission.MEMBER_INVITE,
-		]);
-		this.assertCanAssignRole(actor, requestedRole);
-		return actor;
+	): BoardAccessContext {
+		this.assertContextPermissions(context, [BoardPermission.MEMBER_INVITE]);
+		this.assertCanAssignRole(context, requestedRole);
+		return context;
 	}
 
-	/** Applies the target-sensitive constraints that a role matrix cannot express. */
-	async assertCanManageMember(
-		actorUserId: string,
-		boardId: string,
+	assertCanManageMember(
+		context: BoardAccessContext,
 		targetUserId: string,
+		targetRole: Exclude<BoardRole, BoardRole.OWNER>,
 		requestedRole?: BoardRole,
-	): Promise<BoardAccessContext> {
-		if (!isUUID(targetUserId, "4")) {
-			throw new BadRequestException("User ID must be a valid UUID.");
-		}
-
-		const actor = await this.assertPermissions(actorUserId, boardId, [
-			requestedRole !== undefined
-				? BoardPermission.MEMBER_ROLE_UPDATE
-				: BoardPermission.MEMBER_REMOVE,
+	): BoardAccessContext {
+		this.assertUuid(targetUserId, "User ID");
+		this.assertContextPermissions(context, [
+			requestedRole === undefined
+				? BoardPermission.MEMBER_REMOVE
+				: BoardPermission.MEMBER_ROLE_UPDATE,
 		]);
 
-		if (actorUserId === targetUserId) {
+		if (context.userId === targetUserId) {
 			throw new BadRequestException(
 				"Members cannot change or remove their own membership.",
 			);
 		}
 		if (requestedRole !== undefined) {
-			this.assertCanAssignRole(actor, requestedRole);
+			this.assertCanAssignRole(context, requestedRole);
 		}
-		if (targetUserId === actor.ownerId) {
+		if (targetUserId === context.ownerId) {
 			throw new ForbiddenException(
 				"The board owner cannot be managed through this operation.",
 			);
 		}
 
-		const target = await this.prisma.boardMember.findUnique({
-			where: { boardId_userId: { boardId, userId: targetUserId } },
-			select: { role: true },
-		});
-		if (!target) {
-			throw new NotFoundException("Board member not found.");
-		}
-
-		const targetRole = this.toBoardRole(target.role);
 		if (
-			actor.role === BoardRole.ADMIN &&
+			context.role === BoardRole.ADMIN &&
 			(targetRole === BoardRole.ADMIN || requestedRole === BoardRole.ADMIN)
 		) {
 			throw new ForbiddenException(
 				"Administrators can only manage regular members and viewers.",
 			);
 		}
-
-		return actor;
+		return context;
 	}
 
-	private assertBoardId(boardId: string): void {
-		if (!isUUID(boardId, "4")) {
-			throw new BadRequestException("Board ID must be a valid UUID.");
-		}
-	}
-
-	private assertCanAssignRole(
-		actor: BoardAccessContext,
-		requestedRole: BoardRole,
-	): void {
-		if (requestedRole === BoardRole.OWNER) {
-			throw new BadRequestException(
-				"Use the ownership transfer operation to assign an owner.",
-			);
-		}
-		if (actor.role === BoardRole.ADMIN && requestedRole === BoardRole.ADMIN) {
-			throw new ForbiddenException(
-				"Administrators cannot assign the administrator role.",
-			);
-		}
-	}
-
-	private toBoardRole(
-		role: PersistedBoardRole | undefined,
-	): BoardRole | undefined {
+	toBoardRole(role: PersistedBoardRole): Exclude<BoardRole, BoardRole.OWNER> {
 		switch (role) {
 			case PersistedBoardRole.ADMIN:
 				return BoardRole.ADMIN;
@@ -181,8 +162,47 @@ export class BoardAccessService {
 				return BoardRole.MEMBER;
 			case PersistedBoardRole.VIEWER:
 				return BoardRole.VIEWER;
-			case undefined:
-				return undefined;
 		}
+	}
+
+	toPersistedBoardRole(
+		role: Exclude<BoardRole, BoardRole.OWNER>,
+	): PersistedBoardRole {
+		switch (role) {
+			case BoardRole.ADMIN:
+				return PersistedBoardRole.ADMIN;
+			case BoardRole.MEMBER:
+				return PersistedBoardRole.MEMBER;
+			case BoardRole.VIEWER:
+				return PersistedBoardRole.VIEWER;
+		}
+	}
+
+	private assertCanAssignRole(
+		context: BoardAccessContext,
+		requestedRole: BoardRole,
+	): asserts requestedRole is Exclude<BoardRole, BoardRole.OWNER> {
+		if (requestedRole === BoardRole.OWNER) {
+			throw new BadRequestException(
+				"Use the ownership transfer operation to assign an owner.",
+			);
+		}
+		if (context.role === BoardRole.ADMIN && requestedRole === BoardRole.ADMIN) {
+			throw new ForbiddenException(
+				"Administrators cannot assign the administrator role.",
+			);
+		}
+	}
+
+	private assertUuid(value: string, label: string): void {
+		if (!isUUID(value, "4")) {
+			throw new BadRequestException(`${label} must be a valid UUID.`);
+		}
+	}
+
+	private toOptionalBoardRole(
+		role: PersistedBoardRole | undefined,
+	): BoardRole | undefined {
+		return role === undefined ? undefined : this.toBoardRole(role);
 	}
 }

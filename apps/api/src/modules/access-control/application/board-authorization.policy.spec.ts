@@ -18,6 +18,7 @@ describe("BoardAuthorizationPolicy", () => {
 			[
 				BoardPermission.BOARD_READ,
 				BoardPermission.BOARD_UPDATE,
+				BoardPermission.INVITATION_READ,
 				BoardPermission.MEMBER_INVITE,
 				BoardPermission.MEMBER_ROLE_UPDATE,
 				BoardPermission.MEMBER_REMOVE,

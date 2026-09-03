@@ -12,6 +12,7 @@ const policy = {
 	permissions: [BoardPermission.BOARD_READ],
 };
 const boardAccess: BoardAccessContext = {
+	archivedAt: null,
 	boardId,
 	ownerId: userId,
 	role: BoardRole.OWNER,

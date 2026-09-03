@@ -10,3 +10,11 @@ export enum BoardRole {
 	MEMBER = "MEMBER",
 	VIEWER = "VIEWER",
 }
+
+export type BoardMembershipRole = Exclude<BoardRole, BoardRole.OWNER>;
+
+export const boardMembershipRoles = [
+	BoardRole.ADMIN,
+	BoardRole.MEMBER,
+	BoardRole.VIEWER,
+] as const satisfies readonly BoardMembershipRole[];

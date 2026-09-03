@@ -21,6 +21,21 @@ describe("service foundation", () => {
 		id: currentUser.id,
 		name: currentUser.name,
 	});
+	const boardId = "10000000-0000-4000-8000-000000000001";
+	const boardResponse = {
+		archivedAt: null,
+		color: "#6366f1",
+		createdAt: new Date("2026-09-03T00:00:00.000Z"),
+		description: null,
+		id: boardId,
+		ownerId: currentUser.id,
+		role: "OWNER",
+		title: "Planning",
+		updatedAt: new Date("2026-09-03T00:00:00.000Z"),
+		version: 1,
+	};
+	const createBoard = vi.fn().mockResolvedValue(boardResponse);
+	const leaveBoard = vi.fn().mockResolvedValue(undefined);
 
 	beforeAll(async () => {
 		vi.stubEnv("API_PREFIX", "api/v1");
@@ -44,6 +59,15 @@ describe("service foundation", () => {
 		const { AuthenticationService } = await import(
 			"./modules/identity/application/authentication.service.js"
 		);
+		const { BoardAccessService } = await import(
+			"./modules/access-control/application/board-access.service.js"
+		);
+		const { BoardMembersService } = await import(
+			"./modules/board-members/application/board-members.service.js"
+		);
+		const { BoardsService } = await import(
+			"./modules/boards/application/boards.service.js"
+		);
 		const { configureApplication } = await import("./server.js");
 		const moduleRef = await Test.createTestingModule({
 			imports: [AppModule],
@@ -55,6 +79,38 @@ describe("service foundation", () => {
 			})
 			.overrideProvider(AuthenticationService)
 			.useValue({ authenticate, processWebhook })
+			.overrideProvider(BoardAccessService)
+			.useValue({
+				assertPermissions: vi.fn().mockResolvedValue({
+					archivedAt: null,
+					boardId,
+					ownerId: currentUser.id,
+					role: "OWNER",
+					userId: currentUser.id,
+				}),
+			})
+			.overrideProvider(BoardsService)
+			.useValue({
+				archive: vi.fn(),
+				create: createBoard,
+				detail: vi.fn(),
+				list: vi.fn().mockResolvedValue({ boards: [], nextCursor: null }),
+				restore: vi.fn(),
+				update: vi.fn(),
+			})
+			.overrideProvider(BoardMembersService)
+			.useValue({
+				acceptInvitation: vi.fn(),
+				cancelInvitation: vi.fn(),
+				createInvitation: vi.fn(),
+				leave: leaveBoard,
+				list: vi.fn(),
+				listInvitations: vi.fn(),
+				removeMember: vi.fn(),
+				resendInvitation: vi.fn(),
+				transferOwnership: vi.fn(),
+				updateRole: vi.fn(),
+			})
 			.compile();
 
 		app = moduleRef.createNestApplication({ bufferLogs: true, rawBody: true });
@@ -121,6 +177,12 @@ describe("service foundation", () => {
 					scheme: "bearer",
 					type: "http",
 				});
+				expect(body.paths).toHaveProperty("/api/v1/boards/{boardId}/restore");
+				expect(body.paths).toHaveProperty("/api/v1/invitations/accept");
+				expect(body.components?.schemas).toHaveProperty("BoardResponseDto");
+				expect(body.components?.schemas).toHaveProperty(
+					"InvitationTokenResponseDto",
+				);
 			});
 	});
 
@@ -146,6 +208,36 @@ describe("service foundation", () => {
 			.expect(200)
 			.expect(currentUser);
 		expect(authenticate).toHaveBeenCalledWith("session-token");
+	});
+
+	it("validates and normalizes board requests", async () => {
+		await request(app.getHttpServer())
+			.get("/api/v1/boards")
+			.query({ includeArchived: "sometimes" })
+			.set("authorization", "Bearer session-token")
+			.expect(400);
+		await request(app.getHttpServer())
+			.post("/api/v1/boards")
+			.set("authorization", "Bearer session-token")
+			.send({ title: "  Planning  ", unexpected: true })
+			.expect(400);
+		await request(app.getHttpServer())
+			.post("/api/v1/boards")
+			.set("authorization", "Bearer session-token")
+			.send({ color: "#AABBCC", title: "  Planning  " })
+			.expect(201);
+		expect(createBoard).toHaveBeenCalledWith(
+			currentUser.id,
+			expect.objectContaining({ color: "#aabbcc", title: "Planning" }),
+		);
+	});
+
+	it("routes the static current-member leave path before member IDs", async () => {
+		await request(app.getHttpServer())
+			.delete(`/api/v1/boards/${boardId}/members/me`)
+			.set("authorization", "Bearer session-token")
+			.expect(204);
+		expect(leaveBoard).toHaveBeenCalledOnce();
 	});
 
 	it("resolves only a validated exact email", async () => {

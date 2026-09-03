@@ -56,6 +56,26 @@ context, and enforce the role-permission matrix; target-sensitive membership
 operations are checked by `BoardAccessService`. `Board.ownerId` is the sole
 ownership source, so owners must not also be inserted as board members.
 
+## Boards and invitations
+
+Authenticated clients can create and page through boards at `/api/v1/boards`.
+Board detail, update, archive, and restore operations use the board's positive
+integer `version` for optimistic concurrency. Archived boards remain readable
+to existing collaborators but are otherwise read-only until their owner
+restores them.
+
+Board membership and invitation routes are nested below
+`/api/v1/boards/:boardId`. Owners are returned as members with the computed
+`OWNER` role but are never stored in `board_members`; assignable roles are
+`ADMIN`, `MEMBER`, and `VIEWER`. Invitation history can be filtered by status
+and paged without exposing secret material.
+
+Creating or resending an invitation returns its raw token exactly once so a
+client can build a delivery link. PostgreSQL stores only the token's SHA-256
+hash, and list endpoints never return either the token or hash. A recipient
+accepts it through `POST /api/v1/invitations/accept`. Mutations atomically write
+both user-visible activity and an outbox event for reliable downstream work.
+
 ## Commands
 
 | Command | Purpose |
