@@ -76,6 +76,11 @@ hash, and list endpoints never return either the token or hash. A recipient
 accepts it through `POST /api/v1/invitations/accept`. Mutations atomically write
 both user-visible activity and an outbox event for reliable downstream work.
 
+AI task-generation and board-summary endpoints accept durable work at
+`/api/v1/boards/:boardId/ai`. A successful `202 Accepted` response means the run
+has been persisted with `QUEUED` status; provider execution is intentionally
+handled by a future worker and is not performed by this API process.
+
 ## Commands
 
 | Command | Purpose |

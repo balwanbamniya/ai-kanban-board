@@ -232,8 +232,8 @@ model AiRun {
   boardId        String          @map("board_id") @db.Uuid
   actorId        String?         @map("actor_id") @db.Uuid
   operationKind  AiOperationKind @map("operation_kind")
-  provider       String
-  model          String
+  provider       String?
+  model          String?
   promptVersion  String          @map("prompt_version")
   status         AiRunStatus     @default(QUEUED)
   input          Json            @db.JsonB
