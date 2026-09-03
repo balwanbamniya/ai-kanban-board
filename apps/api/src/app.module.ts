@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "./config/config.module.js";
 import { AccessControlModule } from "./modules/access-control/access-control.module.js";
+import { ActivityModule } from "./modules/activity/activity.module.js";
 import { BoardMembersModule } from "./modules/board-members/board-members.module.js";
 import { BoardsModule } from "./modules/boards/boards.module.js";
 import { ColumnsModule } from "./modules/columns/columns.module.js";
@@ -13,6 +14,7 @@ import { TelemetryLifecycleService } from "./observability/telemetry-lifecycle.s
 	imports: [
 		ConfigModule,
 		AccessControlModule,
+		ActivityModule,
 		BoardMembersModule,
 		BoardsModule,
 		ColumnsModule,
