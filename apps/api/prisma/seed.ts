@@ -126,7 +126,7 @@ async function seed(): Promise<void> {
 
 	for (const column of [
 		{ id: todoColumnId, title: "Todo", sortKey: "a0" },
-		{ id: doneColumnId, title: "Done", sortKey: "z0" },
+		{ id: doneColumnId, title: "Done", sortKey: "a1" },
 	]) {
 		await prisma.column.upsert({
 			where: { id: column.id },

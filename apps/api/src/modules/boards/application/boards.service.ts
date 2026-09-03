@@ -19,9 +19,9 @@ import { BoardEventName, recordBoardEvent } from "./board-events.js";
 const DEFAULT_BOARD_COLOR = "#6366f1";
 const DEFAULT_COLUMNS = [
 	{ title: "Todo", sortKey: "a0" },
-	{ title: "In Progress", sortKey: "b0" },
-	{ title: "Review", sortKey: "c0" },
-	{ title: "Done", sortKey: "d0" },
+	{ title: "In Progress", sortKey: "a1" },
+	{ title: "Review", sortKey: "a2" },
+	{ title: "Done", sortKey: "a3" },
 ] as const;
 
 type BoardRecord = {
