@@ -1,4 +1,8 @@
-import { type INestApplication, RequestMethod } from "@nestjs/common";
+import {
+	type INestApplication,
+	RequestMethod,
+	ValidationPipe,
+} from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import helmet from "helmet";
@@ -32,6 +36,13 @@ export function configureApplication(app: INestApplication): INestApplication {
 	);
 	app.enableShutdownHooks();
 	app.enableCors({ origin: config.corsOrigins });
+	app.useGlobalPipes(
+		new ValidationPipe({
+			forbidNonWhitelisted: true,
+			transform: true,
+			whitelist: true,
+		}),
+	);
 	app.setGlobalPrefix(config.apiPrefix, {
 		exclude: [{ path: "health", method: RequestMethod.GET }],
 	});
@@ -41,6 +52,7 @@ export function configureApplication(app: INestApplication): INestApplication {
 			.setTitle("AI Kanban API")
 			.setDescription("HTTP API for the AI Kanban Board")
 			.setVersion("1.0")
+			.addBearerAuth()
 			.build();
 		const document = SwaggerModule.createDocument(app, swaggerConfig);
 		SwaggerModule.setup("docs", app, document);
@@ -50,7 +62,10 @@ export function configureApplication(app: INestApplication): INestApplication {
 }
 
 export async function createApplication(): Promise<INestApplication> {
-	const app = await NestFactory.create(AppModule, { bufferLogs: true });
+	const app = await NestFactory.create(AppModule, {
+		bufferLogs: true,
+		rawBody: true,
+	});
 	return configureApplication(app);
 }
 

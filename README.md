@@ -6,7 +6,7 @@ workspace combines a server-rendered React frontend with a modular NestJS API.
 ## Stack
 
 - TanStack Start, React, Vite, and Tailwind CSS
-- NestJS with native ECMAScript modules
+- NestJS with native ECMAScript modules and Clerk authentication
 - TypeScript, Biome, Vitest, pnpm, and Turborepo
 
 ## Requirements
@@ -37,6 +37,18 @@ health checks. Interactive API docs are available at
 API configuration, including the PostgreSQL connection and pool limits, is
 validated before Nest finishes starting. The local Compose services bind only
 to the loopback interface.
+
+The API requires a Clerk secret key, JWT public key, webhook signing secret,
+and an explicit list of authorized frontend origins. Copy these values from the
+Clerk Dashboard into `apps/api/.env`; never commit that file. Configure the
+Clerk webhook endpoint as `POST /api/v1/webhooks/clerk` and subscribe it to
+`user.created`, `user.updated`, and `user.deleted`. Protected API requests must
+send a Clerk session JWT as `Authorization: Bearer <token>`.
+
+Clerk remains the profile source of truth. Signed webhooks update the local user
+record, while the first authenticated request can provision a missing record if
+the creation webhook is delayed. The API stores application roles locally and
+never derives them from Clerk profile data.
 
 ## Commands
 

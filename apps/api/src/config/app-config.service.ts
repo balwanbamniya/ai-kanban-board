@@ -20,6 +20,26 @@ export class AppConfigService {
 		return this.config.getOrThrow("DATABASE_POOL_MAX");
 	}
 
+	get clerkAudience(): string[] {
+		return this.config.get("CLERK_AUDIENCE", { infer: true }) ?? [];
+	}
+
+	get clerkAuthorizedParties(): string[] {
+		return this.config.getOrThrow("CLERK_AUTHORIZED_PARTIES");
+	}
+
+	get clerkJwtKey(): string {
+		return this.config.getOrThrow("CLERK_JWT_KEY");
+	}
+
+	get clerkSecretKey(): string {
+		return this.config.getOrThrow("CLERK_SECRET_KEY");
+	}
+
+	get clerkWebhookSigningSecret(): string {
+		return this.config.getOrThrow("CLERK_WEBHOOK_SIGNING_SECRET");
+	}
+
 	get databaseUrl(): string {
 		return this.config.getOrThrow("DATABASE_URL");
 	}

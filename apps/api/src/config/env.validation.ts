@@ -24,6 +24,13 @@ const postgresUrlSchema = z.url().refine(
 	{ message: "must use the postgres or postgresql protocol" },
 );
 
+const commaSeparatedListSchema = z.string().transform((value) =>
+	value
+		.split(",")
+		.map((item) => item.trim())
+		.filter(Boolean),
+);
+
 const environmentSchema = telemetryEnvironmentSchema.extend({
 	NODE_ENV: z
 		.enum(["development", "test", "production"])
@@ -58,6 +65,20 @@ const environmentSchema = telemetryEnvironmentSchema.extend({
 		.min(100)
 		.max(60_000)
 		.default(5000),
+
+	CLERK_SECRET_KEY: z.string().trim().min(1),
+	CLERK_JWT_KEY: z
+		.string()
+		.trim()
+		.min(1)
+		.transform((value) => value.replaceAll("\\n", "\n")),
+	CLERK_WEBHOOK_SIGNING_SECRET: z.string().trim().min(1),
+	CLERK_AUTHORIZED_PARTIES: commaSeparatedListSchema.pipe(
+		z.array(httpOriginSchema).min(1),
+	),
+	CLERK_AUDIENCE: commaSeparatedListSchema
+		.pipe(z.array(z.string().min(1)))
+		.optional(),
 	LOG_LEVEL: z
 		.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
 		.default("info"),

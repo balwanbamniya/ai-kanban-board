@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "../generated/prisma/client.js";
 import { BoardRole } from "../generated/prisma/enums.js";
+import { UserSyncService } from "../modules/users/application/user-sync.service.js";
+import { UserIdentityConflictError } from "../modules/users/domain/user.errors.js";
 import { createPrismaAdapter } from "./prisma-client.js";
 
 const seedBoardId = "10000000-0000-4000-8000-000000000001";
@@ -95,5 +97,84 @@ describe("database foundation", () => {
 				data: { version: 0 },
 			}),
 		).rejects.toThrow();
+	});
+
+	it("orders Clerk profile events, soft-deletes users, and frees their email", async () => {
+		const externalAuthId = `user_${randomUUID()}`;
+		const replacementExternalAuthId = `user_${randomUUID()}`;
+		const conflictingExternalAuthId = `user_${randomUUID()}`;
+		const email = `${randomUUID()}@example.com`;
+		const users = new UserSyncService(prisma as never);
+		const firstUpdate = new Date("2026-09-03T00:00:00.000Z");
+		const deletion = new Date("2026-09-03T00:01:00.000Z");
+
+		try {
+			const [first, concurrent] = await Promise.all([
+				users.synchronize({
+					email,
+					externalAuthId,
+					name: "Current profile",
+					providerUpdatedAt: firstUpdate,
+				}),
+				users.synchronize({
+					email,
+					externalAuthId,
+					name: "Current profile",
+					providerUpdatedAt: firstUpdate,
+				}),
+			]);
+			expect(first?.id).toBe(concurrent?.id);
+
+			await users.synchronize({
+				email,
+				externalAuthId,
+				name: "Stale profile",
+				providerUpdatedAt: new Date("2026-09-02T00:00:00.000Z"),
+			});
+			expect(await users.findCurrentUser(externalAuthId)).toMatchObject({
+				name: "Current profile",
+			});
+			await expect(
+				users.synchronize({
+					email,
+					externalAuthId: conflictingExternalAuthId,
+					name: "Conflicting account",
+					providerUpdatedAt: firstUpdate,
+				}),
+			).rejects.toBeInstanceOf(UserIdentityConflictError);
+
+			await users.softDelete(externalAuthId, deletion);
+			await users.softDelete(externalAuthId, deletion);
+			expect(await users.findCurrentUser(externalAuthId)).toBeNull();
+
+			await users.synchronize({
+				email,
+				externalAuthId,
+				name: "Stale after deletion",
+				providerUpdatedAt: firstUpdate,
+			});
+			expect(await users.findCurrentUser(externalAuthId)).toBeNull();
+
+			await expect(
+				users.synchronize({
+					email,
+					externalAuthId: replacementExternalAuthId,
+					name: "Replacement account",
+					providerUpdatedAt: deletion,
+				}),
+			).resolves.toMatchObject({ email });
+		} finally {
+			await prisma.user.deleteMany({
+				where: {
+					externalAuthId: {
+						in: [
+							externalAuthId,
+							replacementExternalAuthId,
+							conflictingExternalAuthId,
+						],
+					},
+				},
+			});
+		}
 	});
 });

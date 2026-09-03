@@ -56,14 +56,16 @@ enum AiRunStatus {
 }
 
 model User {
-  id             String       @id @default(uuid()) @db.Uuid
-  externalAuthId String       @unique @map("external_auth_id")
-  email          String       @unique
-  name           String
-  avatarUrl      String?      @map("avatar_url")
-  platformRole   PlatformRole @default(USER) @map("platform_role")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                        String       @id @default(uuid()) @db.Uuid
+  externalAuthId            String       @unique @map("external_auth_id")
+  email                     String?      @unique
+  name                      String
+  avatarUrl                 String?      @map("avatar_url")
+  platformRole              PlatformRole @default(USER) @map("platform_role")
+  identityProviderUpdatedAt DateTime?    @map("identity_provider_updated_at") @db.Timestamptz(6)
+  deletedAt                 DateTime?    @map("deleted_at") @db.Timestamptz(6)
+  createdAt                 DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   ownedBoards         Board[]           @relation("BoardOwner")
   memberships         BoardMember[]
@@ -75,6 +77,7 @@ model User {
   activities          Activity[]        @relation("ActivityActor")
   aiRuns              AiRun[]           @relation("AiRunActor")
 
+  @@index([deletedAt])
   @@map("users")
 }
 

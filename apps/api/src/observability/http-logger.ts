@@ -63,6 +63,7 @@ export function createHttpLogger({
 			paths: [
 				"req.headers.authorization",
 				"req.headers.cookie",
+				"req.headers.svix-signature",
 				"req.headers.x-api-key",
 				"res.headers.set-cookie",
 			],
