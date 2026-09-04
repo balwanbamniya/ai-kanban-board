@@ -59,6 +59,8 @@ export class ListBoardsResponseDto {
 }
 
 export class BoardColumnDto {
+	@ApiProperty() isCompleted!: boolean;
+	@ApiProperty({ minimum: 0 }) taskCount!: number;
 	@ApiProperty({ format: "date-time" })
 	createdAt!: Date;
 

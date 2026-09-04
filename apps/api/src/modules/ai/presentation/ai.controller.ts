@@ -8,6 +8,7 @@ import {
 	Param,
 	ParseUUIDPipe,
 	Post,
+	Query,
 } from "@nestjs/common";
 import {
 	ApiAcceptedResponse,
@@ -39,10 +40,15 @@ import {
 	CreateAiRunDto,
 	TaskGenerationRunDto,
 } from "./dto/create-ai-run.dto.js";
+import {
+	ListAiRunsQueryDto,
+	ListAiRunsResponseDto,
+} from "./dto/list-ai-runs.dto.js";
 
 @ApiTags("ai")
 @ApiBearerAuth()
 @ApiExtraModels(
+	ListAiRunsQueryDto,
 	CreateAiRunDto,
 	TaskGenerationRunDto,
 	BoardSummaryRunDto,
@@ -56,6 +62,15 @@ export class AiController {
 		private readonly applications: AiApplicationService,
 	) {}
 
+	@Get("runs")
+	@ApiOkResponse({ type: ListAiRunsResponseDto })
+	@CheckBoardPermissions(BoardPermission.AI_RUN)
+	list(
+		@CurrentBoardAccess() context: BoardAccessContext,
+		@Query() query: ListAiRunsQueryDto,
+	) {
+		return this.runs.list(context, query);
+	}
 	@Post("task-generation-runs")
 	@ApiBody({ type: TaskGenerationRunDto })
 	@HttpCode(HttpStatus.ACCEPTED)

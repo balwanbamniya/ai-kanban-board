@@ -2,6 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import type { ColumnResponse } from "../../application/columns.service.js";
 
 export class ColumnResponseDto implements ColumnResponse {
+	@ApiProperty() isCompleted!: boolean;
 	@ApiProperty({ format: "date-time" })
 	createdAt!: Date;
 

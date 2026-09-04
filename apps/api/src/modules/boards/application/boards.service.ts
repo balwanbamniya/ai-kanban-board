@@ -21,7 +21,7 @@ const DEFAULT_COLUMNS = [
 	{ title: "Todo", sortKey: "a0" },
 	{ title: "In Progress", sortKey: "a1" },
 	{ title: "Review", sortKey: "a2" },
-	{ title: "Done", sortKey: "a3" },
+	{ title: "Done", sortKey: "a3", isCompleted: true },
 ] as const;
 
 type BoardRecord = {
@@ -57,6 +57,8 @@ export interface BoardMemberResponse {
 export interface BoardDetailResponse {
 	board: BoardListItem;
 	columns: Array<{
+		isCompleted: boolean;
+		taskCount: number;
 		createdAt: Date;
 		id: string;
 		sortKey: string;
@@ -196,8 +198,19 @@ export class BoardsService {
 				taskCount,
 			},
 			columns: board.columns.map(
-				({ createdAt, id, sortKey, title, updatedAt, version }) => ({
+				({
 					createdAt,
+					id,
+					sortKey,
+					title,
+					updatedAt,
+					version,
+					isCompleted,
+					_count,
+				}) => ({
+					createdAt,
+					isCompleted,
+					taskCount: _count.tasks,
 					id,
 					sortKey,
 					title,

@@ -1,8 +1,18 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
-import { IsString, MaxLength, MinLength } from "class-validator";
+import {
+	IsBoolean,
+	IsString,
+	MaxLength,
+	MinLength,
+	ValidateIf,
+} from "class-validator";
 
 export class CreateColumnDto {
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsBoolean()
+	@ApiPropertyOptional({ type: Boolean })
+	isCompleted?: boolean;
 	@Transform(({ value }: { value: unknown }) =>
 		typeof value === "string" ? value.trim() : value,
 	)

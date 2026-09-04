@@ -16,7 +16,26 @@ export class TaskAssigneeResponseDto {
 	name!: string;
 }
 
+export class TaskBoardContextDto {
+	@ApiProperty() id!: string;
+	@ApiProperty() title!: string;
+	@ApiProperty() color!: string;
+	@ApiProperty({ nullable: true, type: String, format: "date-time" })
+	archivedAt!: Date | null;
+}
+export class TaskColumnContextDto {
+	@ApiProperty() id!: string;
+	@ApiProperty() title!: string;
+	@ApiProperty() isCompleted!: boolean;
+	@ApiProperty({ type: TaskBoardContextDto }) board!: TaskBoardContextDto;
+}
+export class SubtaskCountDto {
+	@ApiProperty({ minimum: 0 }) subtasks!: number;
+}
 export class TaskResponseDto implements TaskResponse {
+	@ApiProperty({ type: TaskColumnContextDto }) column!: TaskColumnContextDto;
+	@ApiProperty({ type: SubtaskCountDto }) _count!: SubtaskCountDto;
+
 	@ApiPropertyOptional({ type: TaskAssigneeResponseDto })
 	assignee!: TaskAssigneeResponseDto | null;
 

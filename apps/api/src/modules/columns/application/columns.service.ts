@@ -19,6 +19,7 @@ import type { UpdateColumnDto } from "../presentation/dto/update-column.dto.js";
 import { ColumnEventName, recordColumnEvent } from "./column-events.js";
 
 export interface ColumnResponse {
+	isCompleted: boolean;
 	createdAt: Date;
 	id: string;
 	sortKey: string;
@@ -56,6 +57,7 @@ export class ColumnsService {
 					boardId: context.boardId,
 					sortKey: generateKeyBetween(last?.sortKey ?? null, null),
 					title: dto.title,
+					isCompleted: dto.isCompleted ?? false,
 				},
 			});
 			await recordColumnEvent(transaction, {
@@ -64,7 +66,11 @@ export class ColumnsService {
 				boardId: context.boardId,
 				eventName: ColumnEventName.CREATED,
 				message: "Column created",
-				payload: { columnId: column.id, title: column.title },
+				payload: {
+					columnId: column.id,
+					title: column.title,
+					isCompleted: column.isCompleted,
+				},
 			});
 			return column;
 		});
@@ -83,7 +89,7 @@ export class ColumnsService {
 			await this.boardAccess.assertFreshContext(transaction, context);
 			const existing = await transaction.column.findFirst({
 				where: { boardId: context.boardId, id: columnId },
-				select: { title: true, version: true },
+				select: { title: true, version: true, isCompleted: true },
 			});
 			if (!existing) throw new NotFoundException("Column not found.");
 			if (existing.version !== dto.version) {
@@ -91,7 +97,11 @@ export class ColumnsService {
 					"Column has changed. Refresh and try again.",
 				);
 			}
-			if (existing.title === dto.title) {
+			if (
+				existing.title === dto.title &&
+				(dto.isCompleted === undefined ||
+					dto.isCompleted === existing.isCompleted)
+			) {
 				throw new BadRequestException("Column title is unchanged.");
 			}
 
@@ -101,7 +111,13 @@ export class ColumnsService {
 					id: columnId,
 					version: dto.version,
 				},
-				data: { title: dto.title, version: { increment: 1 } },
+				data: {
+					title: dto.title,
+					...(dto.isCompleted === undefined
+						? {}
+						: { isCompleted: dto.isCompleted }),
+					version: { increment: 1 },
+				},
 			});
 			if (update.count !== 1) {
 				throw new ConflictException(
@@ -117,7 +133,11 @@ export class ColumnsService {
 				boardId: context.boardId,
 				eventName: ColumnEventName.UPDATED,
 				message: "Column updated",
-				payload: { columnId: column.id, title: column.title },
+				payload: {
+					columnId: column.id,
+					title: column.title,
+					isCompleted: column.isCompleted,
+				},
 			});
 			return column;
 		});

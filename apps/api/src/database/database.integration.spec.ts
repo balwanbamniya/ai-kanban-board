@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
 	ConflictException,
 	ForbiddenException,
@@ -602,5 +603,31 @@ describe("database foundation", () => {
 				},
 			});
 		}
+	});
+	it("migrates existing columns without guessing completion from their title", async () => {
+		const migration = readFileSync(
+			new URL(
+				"../../prisma/migrations/20260904120000_frontend_completion/migration.sql",
+				import.meta.url,
+			),
+			"utf8",
+		);
+		await prisma.$transaction(async (tx) => {
+			await tx.$executeRawUnsafe(
+				"CREATE TEMP TABLE columns (id text, title text) ON COMMIT DROP",
+			);
+			await tx.$executeRawUnsafe(
+				"CREATE TEMP TABLE tasks (id uuid, due_date timestamptz, assignee_id uuid) ON COMMIT DROP",
+			);
+			await tx.$executeRawUnsafe(
+				"INSERT INTO columns VALUES ('legacy', 'Done')",
+			);
+			for (const statement of migration.split(";").filter((x) => x.trim()))
+				await tx.$executeRawUnsafe(statement);
+			const rows = await tx.$queryRawUnsafe<Array<{ is_completed: boolean }>>(
+				"SELECT is_completed FROM columns",
+			);
+			expect(rows).toEqual([{ is_completed: false }]);
+		});
 	});
 });

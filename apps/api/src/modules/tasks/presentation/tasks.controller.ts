@@ -63,6 +63,15 @@ export class TasksController {
 		return this.tasks.list(context, query);
 	}
 
+	@Get(":taskId")
+	@ApiOkResponse({ type: TaskResponseDto })
+	@CheckBoardPermissions(BoardPermission.BOARD_READ)
+	detail(
+		@CurrentBoardAccess() context: BoardAccessContext,
+		@Param("taskId", new ParseUUIDPipe({ version: "4" })) taskId: string,
+	) {
+		return this.tasks.detail(context, taskId);
+	}
 	@Post()
 	@ApiCreatedResponse({ type: TaskResponseDto })
 	@CheckBoardPermissions(BoardPermission.TASK_CREATE)

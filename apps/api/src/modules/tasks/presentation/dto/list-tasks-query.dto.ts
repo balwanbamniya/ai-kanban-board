@@ -1,9 +1,49 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsEnum, IsInt, IsUUID, Max, Min, ValidateIf } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import {
+	IsBoolean,
+	IsEnum,
+	IsInt,
+	IsISO8601,
+	IsString,
+	IsUUID,
+	Max,
+	MaxLength,
+	Min,
+	ValidateIf,
+} from "class-validator";
 import { TaskPriority } from "../../../../generated/prisma/enums.js";
 
 export class ListTasksQueryDto {
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsUUID("4")
+	@ApiPropertyOptional()
+	boardId?: string;
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsUUID("4")
+	@ApiPropertyOptional()
+	parentTaskId?: string;
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsString()
+	@MaxLength(200)
+	@ApiPropertyOptional()
+	search?: string;
+	@Transform(({ value }: { value: unknown }) =>
+		value === "true" ? true : value === "false" ? false : value,
+	)
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsBoolean()
+	@ApiPropertyOptional({ type: Boolean })
+	completed?: boolean;
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsISO8601({ strict: true })
+	@ApiPropertyOptional()
+	dueFrom?: string;
+	@ValidateIf((_o, v: unknown) => v !== undefined)
+	@IsISO8601({ strict: true })
+	@ApiPropertyOptional()
+	dueBefore?: string;
+
 	@ValidateIf((_object, value: unknown) => value !== undefined)
 	@IsUUID("4")
 	@ApiPropertyOptional({ type: String })

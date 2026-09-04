@@ -146,6 +146,7 @@ model BoardInvitation {
 }
 
 model Column {
+  isCompleted Boolean @default(false) @map("is_completed")
   id        String   @id @default(uuid()) @db.Uuid
   boardId   String   @map("board_id") @db.Uuid
   title     String
@@ -188,6 +189,8 @@ model Task {
   @@index([boardId, sortKey])
   @@index([boardId, assigneeId])
   @@index([parentTaskId])
+  @@index([dueDate, id])
+  @@index([assigneeId, dueDate, id])
   @@map("tasks")
 }
 

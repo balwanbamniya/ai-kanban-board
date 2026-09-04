@@ -66,6 +66,35 @@ export class AiRunsService {
 		@Inject(AppConfigService) private readonly config: AppConfigService,
 	) {}
 
+	async list(
+		context: BoardAccessContext,
+		query: { limit: number; cursor?: string },
+	) {
+		this.boardAccess.assertContextPermissions(context, [
+			BoardPermission.AI_RUN,
+		]);
+		if (
+			query.cursor &&
+			!(await this.prisma.aiRun.findFirst({
+				where: { id: query.cursor, boardId: context.boardId },
+				select: { id: true },
+			}))
+		)
+			throw new BadRequestException("Invalid AI run cursor.");
+		const rows = await this.prisma.aiRun.findMany({
+			where: { boardId: context.boardId },
+			orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+			cursor: query.cursor ? { id: query.cursor } : undefined,
+			skip: query.cursor ? 1 : undefined,
+			take: query.limit + 1,
+			select: aiRunSelect,
+		});
+		const runs = rows.slice(0, query.limit);
+		return {
+			runs,
+			nextCursor: rows.length > query.limit ? (runs.at(-1)?.id ?? null) : null,
+		};
+	}
 	async create(
 		context: BoardAccessContext,
 		operationKind: AiOperationKind,

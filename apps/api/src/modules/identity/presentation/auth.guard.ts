@@ -20,6 +20,8 @@ export class AuthGuard implements CanActivate {
 	) {}
 
 	async canActivate(context: ExecutionContext): Promise<boolean> {
+		// Socket.IO authenticates its handshake and revalidates board access in the gateway.
+		if (context.getType() === "ws") return true;
 		const isPublic = this.reflector.getAllAndOverride(Public, [
 			context.getHandler(),
 			context.getClass(),

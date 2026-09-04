@@ -3,13 +3,16 @@ import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import { UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { io } from "socket.io-client";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { AppConfigService } from "./config/app-config.service.js";
 import { PrismaService } from "./database/prisma.service.js";
 import { createPrismaAdapter } from "./database/prisma-client.js";
 import { PrismaClient } from "./generated/prisma/client.js";
 import { AuthenticationService } from "./modules/identity/application/authentication.service.js";
 import { RealtimeRedisService } from "./modules/realtime/realtime-redis.service.js";
+import { RedisIoAdapter } from "./modules/realtime/redis-io.adapter.js";
 
 describe("authenticated HTTP collaboration workflow", () => {
 	let app: NestExpressApplication;
@@ -62,15 +65,18 @@ describe("authenticated HTTP collaboration workflow", () => {
 					return user;
 				},
 			})
-			.overrideProvider(RealtimeRedisService)
-			.useValue({ command: { ping: async () => "PONG" } })
 			.compile();
 		app = module.createNestApplication<NestExpressApplication>({
 			rawBody: true,
 			bufferLogs: true,
 		});
 		configureApplication(app);
-		await app.init();
+		const redis = app.get(RealtimeRedisService);
+		await redis.connect();
+		app.useWebSocketAdapter(
+			new RedisIoAdapter(app, app.get(AppConfigService), redis),
+		);
+		await app.listen(0, "127.0.0.1");
 	});
 	afterAll(async () => {
 		await app?.close();
@@ -267,5 +273,227 @@ describe("authenticated HTTP collaboration workflow", () => {
 			.get(base)
 			.set("authorization", "Bearer owner")
 			.expect(404);
+	});
+	it("queries completion, hierarchy, dates, stable pages, and revoked access across boards", async () => {
+		const server = app.getHttpServer();
+		const owner = users[0];
+		if (!owner) throw new Error("Fixture missing");
+		const get = (path: string, actor = "owner") =>
+			request(server)
+				.get(`/api/v1${path}`)
+				.set("authorization", `Bearer ${actor}`);
+		const post = (path: string, body: object) =>
+			request(server)
+				.post(`/api/v1${path}`)
+				.set("authorization", "Bearer owner")
+				.send(body);
+		const patch = (path: string, body: object, actor = "owner") =>
+			request(server)
+				.patch(`/api/v1${path}`)
+				.set("authorization", `Bearer ${actor}`)
+				.send(body);
+		const created = await post("/boards", { title: "Query fixture" }).expect(
+			201,
+		);
+		const id = created.body.id;
+		boardIds.push(id);
+		const base = `/boards/${id}`;
+		const detail = await get(base).expect(200);
+		const first = detail.body.columns[0];
+		const done = detail.body.columns.find(
+			(c: { isCompleted: boolean }) => c.isCompleted,
+		);
+		expect(done.title).toBe("Done");
+		expect(first.isCompleted).toBe(false);
+		const parent = await post(`${base}/tasks`, {
+			title: "Parent",
+			columnId: first.id,
+			assigneeId: owner.id,
+			dueDate: "2026-03-08T05:00:00Z",
+			priority: "HIGH",
+		}).expect(201);
+		const child = await post(`${base}/tasks`, {
+			title: "Child",
+			columnId: done.id,
+			parentTaskId: parent.body.id,
+			dueDate: "2026-03-09T04:00:00Z",
+		}).expect(201);
+		const sibling = await post(`${base}/tasks`, {
+			title: "Sibling",
+			columnId: first.id,
+			dueDate: "2026-03-08T05:00:00Z",
+		}).expect(201);
+		expect(
+			(await get(`${base}/tasks/${parent.body.id}`).expect(200)).body._count
+				.subtasks,
+		).toBe(1);
+		expect((await get(base).expect(200)).body.columns[0].taskCount).toBe(2);
+		expect(
+			(
+				await get(`${base}/tasks?parentTaskId=${parent.body.id}`).expect(200)
+			).body.tasks.map((t: { id: string }) => t.id),
+		).toEqual([child.body.id]);
+		expect(
+			(
+				await get(`/tasks?boardId=${id}&completed=true`).expect(200)
+			).body.tasks.map((t: { id: string }) => t.id),
+		).toEqual([child.body.id]);
+		const filtered = await get(
+			`/tasks?boardId=${id}&assigneeId=${owner.id}&priority=HIGH&search=parent&completed=false`,
+		).expect(200);
+		expect(filtered.body.tasks.map((t: { id: string }) => t.id)).toEqual([
+			parent.body.id,
+		]);
+		expect(filtered.body.tasks[0].column.board.title).toBe("Query fixture");
+		const range = await get(
+			`/tasks?boardId=${id}&dueFrom=2026-03-08T05:00:00Z&dueBefore=2026-03-09T04:00:00Z`,
+		).expect(200);
+		expect(range.body.tasks.map((t: { id: string }) => t.id).sort()).toEqual(
+			[parent.body.id, sibling.body.id].sort(),
+		);
+		await get(
+			"/tasks?dueFrom=2026-03-09T04:00:00Z&dueBefore=2026-03-08T05:00:00Z",
+		).expect(400);
+		await get("/tasks?dueFrom=garbage").expect(400);
+		await get("/tasks?completed=garbage").expect(400);
+		const ids: string[] = [];
+		let cursor: string | null = null;
+		do {
+			const page: {
+				body: { tasks: { id: string }[]; nextCursor: string | null };
+			} = await get(
+				`/tasks?boardId=${id}&limit=1${cursor ? `&cursor=${cursor}` : ""}`,
+			).expect(200);
+			ids.push(...page.body.tasks.map((t: { id: string }) => t.id));
+			cursor = page.body.nextCursor;
+		} while (cursor && ids.length < 5);
+		expect(new Set(ids).size).toBe(3);
+		expect(ids).toHaveLength(3);
+		expect(
+			(await get(`/tasks?boardId=${id}`, "outsider").expect(200)).body.tasks,
+		).toEqual([]);
+		await get(`${base}/tasks/${parent.body.id}`, "outsider").expect(404);
+		await get(`/tasks?cursor=${parent.body.id}`, "outsider").expect(400);
+		const invitation = await post(`${base}/invitations`, {
+			email: users[1]?.email,
+			role: "MEMBER",
+		}).expect(201);
+		await request(server)
+			.post("/api/v1/invitations/accept")
+			.set("authorization", "Bearer member")
+			.send({ token: invitation.body.token })
+			.expect(200);
+		expect(
+			(await get(`/tasks?boardId=${id}`, "member").expect(200)).body.tasks,
+		).toHaveLength(3);
+		await patch(
+			`${base}/columns/${first.id}`,
+			{ title: first.title, version: first.version, isCompleted: true },
+			"member",
+		).expect(403);
+		await patch(`${base}/columns/${first.id}`, {
+			title: first.title,
+			version: first.version,
+			isCompleted: true,
+		}).expect(200);
+		await patch(`${base}/columns/${first.id}`, {
+			title: first.title,
+			version: first.version,
+			isCompleted: false,
+		}).expect(409);
+		expect(
+			(await get(`/tasks?boardId=${id}&completed=true`).expect(200)).body.tasks,
+		).toHaveLength(3);
+		await request(server)
+			.delete(`/api/v1${base}/members/${users[1]?.id}`)
+			.set("authorization", "Bearer owner")
+			.expect(204);
+		expect(
+			(await get(`/tasks?boardId=${id}`, "member").expect(200)).body.tasks,
+		).toEqual([]);
+		await request(server)
+			.delete(`/api/v1${base}/tasks/${parent.body.id}`)
+			.set("authorization", "Bearer owner")
+			.send({ version: parent.body.version })
+			.expect(204);
+		expect(
+			(await get(`${base}/tasks/${child.body.id}`).expect(200)).body
+				.parentTaskId,
+		).toBeNull();
+		expect((await get(`${base}/ai/runs?limit=1`).expect(200)).body).toEqual({
+			runs: [],
+			nextCursor: null,
+		});
+		await get(`${base}/ai/runs?limit=invalid`).expect(400);
+		const runIds: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const run = await post(`${base}/ai/task-generation-runs`, {
+				idempotencyKey: randomUUID(),
+				input: { instructions: "Fixture", count: 1 },
+			}).expect(202);
+			runIds.push(run.body.id);
+		}
+		const history = await get(`${base}/ai/runs?limit=2`).expect(200);
+		expect(history.body.runs.map((r: { id: string }) => r.id)).toEqual(
+			runIds.slice(1).reverse(),
+		);
+		const historyTail = await get(
+			`${base}/ai/runs?limit=2&cursor=${history.body.nextCursor}`,
+		).expect(200);
+		expect(historyTail.body.runs.map((r: { id: string }) => r.id)).toEqual([
+			runIds[0],
+		]);
+		expect(historyTail.body.nextCursor).toBeNull();
+
+		const current = await get(base).expect(200);
+		await patch(`${base}/archive`, {
+			version: current.body.board.version,
+		}).expect(200);
+		expect((await get(`/tasks?boardId=${id}`).expect(200)).body.tasks).toEqual(
+			[],
+		);
+		expect((await get(`${base}/tasks`).expect(200)).body.tasks).toHaveLength(2);
+		await get(`${base}/ai/runs?limit=1`).expect(409);
+	});
+	it("authenticates the actual Nest Socket.IO gateway and acknowledges scoped joins", async () => {
+		const client = io(`${await app.getUrl()}/realtime`, {
+			auth: { token: "owner" },
+			autoConnect: false,
+		});
+		const outsider = io(`${await app.getUrl()}/realtime`, {
+			auth: { token: "outsider" },
+			autoConnect: false,
+		});
+		try {
+			for (const socket of [client, outsider]) {
+				await new Promise<void>((resolve, reject) => {
+					socket.once("connect", resolve);
+					socket.once("connect_error", reject);
+					socket.connect();
+				});
+			}
+			const boardId = boardIds[1];
+			const joined = await client
+				.timeout(2000)
+				.emitWithAck("board:join", { boardId });
+			expect(joined.ok).toBe(true);
+			expect(
+				joined.presence.some((u: { id: string }) => u.id === users[0]?.id),
+			).toBe(true);
+			expect(
+				await outsider.timeout(2000).emitWithAck("board:join", { boardId }),
+			).toEqual({ ok: false, error: { code: "access_denied" } });
+			expect(
+				await client
+					.timeout(2000)
+					.emitWithAck("board:join", { boardId: "invalid" }),
+			).toEqual({ ok: false, error: { code: "invalid_payload" } });
+			expect(
+				(await client.timeout(2000).emitWithAck("board:leave", { boardId })).ok,
+			).toBe(true);
+		} finally {
+			client.disconnect();
+			outsider.disconnect();
+		}
 	});
 });

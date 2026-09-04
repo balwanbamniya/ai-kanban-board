@@ -19,6 +19,17 @@ import type { UpdateTaskDto } from "../presentation/dto/update-task.dto.js";
 import { recordTaskEvent, TaskEventName } from "./task-events.js";
 
 const taskInclude = {
+	_count: { select: { subtasks: true } },
+	column: {
+		select: {
+			id: true,
+			title: true,
+			isCompleted: true,
+			board: {
+				select: { id: true, title: true, color: true, archivedAt: true },
+			},
+		},
+	},
 	assignee: {
 		select: { avatarUrl: true, email: true, id: true, name: true },
 	},
@@ -43,32 +54,95 @@ export class TasksService {
 		this.boardAccess.assertContextPermissions(context, [
 			BoardPermission.BOARD_READ,
 		]);
-		if (query.cursor) {
-			const cursor = await this.prisma.task.findFirst({
-				where: {
-					boardId: context.boardId,
-					id: query.cursor,
-					assigneeId: query.assigneeId,
-					columnId: query.columnId,
-					priority: query.priority,
-				},
-				select: { id: true },
-			});
-			if (!cursor) {
-				throw new BadRequestException(
-					"Task cursor does not belong to this board.",
-				);
-			}
-		}
 		const where: Prisma.TaskWhereInput = {
+			...this.filters(query),
 			boardId: context.boardId,
+		};
+		return this.page(where, query, false);
+	}
+	async detail(
+		context: BoardAccessContext,
+		taskId: string,
+	): Promise<TaskResponse> {
+		this.boardAccess.assertContextPermissions(context, [
+			BoardPermission.BOARD_READ,
+		]);
+		const task = await this.prisma.task.findFirst({
+			where: { boardId: context.boardId, id: taskId },
+			include: taskInclude,
+		});
+		if (!task) throw new NotFoundException("Task not found.");
+		return task;
+	}
+	async acrossBoards(userId: string, query: ListTasksQueryDto) {
+		const where: Prisma.TaskWhereInput = {
+			...this.filters(query),
+			column: {
+				isCompleted: query.completed,
+				board: {
+					archivedAt: null,
+					OR: [
+						{ ownerId: userId, owner: { deletedAt: null } },
+						{ members: { some: { userId, user: { deletedAt: null } } } },
+					],
+				},
+			},
+		};
+		return this.page(where, query, true);
+	}
+	private filters(query: ListTasksQueryDto): Prisma.TaskWhereInput {
+		if (
+			query.dueFrom &&
+			query.dueBefore &&
+			new Date(query.dueFrom) >= new Date(query.dueBefore)
+		)
+			throw new BadRequestException("dueFrom must precede dueBefore.");
+		return {
+			boardId: query.boardId,
 			assigneeId: query.assigneeId,
 			columnId: query.columnId,
 			priority: query.priority,
+			parentTaskId: query.parentTaskId,
+			column: { isCompleted: query.completed },
+			...(query.search
+				? {
+						OR: [
+							{ title: { contains: query.search, mode: "insensitive" } },
+							{ description: { contains: query.search, mode: "insensitive" } },
+						],
+					}
+				: {}),
+			...(query.dueFrom || query.dueBefore
+				? {
+						dueDate: {
+							gte: query.dueFrom ? new Date(query.dueFrom) : undefined,
+							lt: query.dueBefore ? new Date(query.dueBefore) : undefined,
+						},
+					}
+				: {}),
 		};
+	}
+	private async page(
+		where: Prisma.TaskWhereInput,
+		query: ListTasksQueryDto,
+		crossBoard: boolean,
+	) {
+		if (
+			query.cursor &&
+			!(await this.prisma.task.findFirst({
+				where: { AND: [where, { id: query.cursor }] },
+				select: { id: true },
+			}))
+		)
+			throw new BadRequestException(
+				"Task cursor is no longer valid. Refresh the list.",
+			);
+
 		const tasks = await this.prisma.task.findMany({
 			where,
-			orderBy: [{ sortKey: "asc" }, { id: "asc" }],
+			orderBy: crossBoard
+				? [{ dueDate: { sort: "asc", nulls: "last" } }, { id: "asc" }]
+				: [{ sortKey: "asc" }, { id: "asc" }],
 			cursor: query.cursor ? { id: query.cursor } : undefined,
 			skip: query.cursor ? 1 : undefined,
 			take: query.limit + 1,
