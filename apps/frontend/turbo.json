@@ -1,0 +1,18 @@
+{
+	"extends": ["//"],
+	"tasks": {
+		"build": {
+			"inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+			"env": ["VITE_CLERK_PUBLISHABLE_KEY", "VITE_API_BASE_URL"],
+			"passThroughEnv": ["CLERK_SECRET_KEY"]
+		},
+		"dev": {
+			"passThroughEnv": [
+				"VITE_CLERK_PUBLISHABLE_KEY",
+				"VITE_API_BASE_URL",
+				"CLERK_SECRET_KEY"
+			]
+		},
+		"test:smoke": { "cache": false, "passThroughEnv": ["FRONTEND_SMOKE_URL"] }
+	}
+}
