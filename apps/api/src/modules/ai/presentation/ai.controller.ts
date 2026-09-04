@@ -12,6 +12,7 @@ import {
 import {
 	ApiAcceptedResponse,
 	ApiBearerAuth,
+	ApiBody,
 	ApiConflictResponse,
 	ApiExtraModels,
 	ApiOkResponse,
@@ -23,21 +24,40 @@ import type { BoardAccessContext } from "../../access-control/domain/board-acces
 import { BoardPermission } from "../../access-control/domain/board-permission.enum.js";
 import { CheckBoardPermissions } from "../../access-control/presentation/check-board-permissions.decorator.js";
 import { CurrentBoardAccess } from "../../access-control/presentation/current-board-access.decorator.js";
+import { AiApplicationService } from "../application/ai-application.service.js";
 import {
 	type AiRunResponse,
 	AiRunsService,
 } from "../application/ai-runs.service.js";
 import { AiRunResponseDto } from "./dto/ai-run-response.dto.js";
-import { CreateAiRunDto } from "./dto/create-ai-run.dto.js";
+import {
+	ApplyAiRunDto,
+	ApplyAiRunResponseDto,
+} from "./dto/apply-ai-run.dto.js";
+import {
+	BoardSummaryRunDto,
+	CreateAiRunDto,
+	TaskGenerationRunDto,
+} from "./dto/create-ai-run.dto.js";
 
 @ApiTags("ai")
 @ApiBearerAuth()
-@ApiExtraModels(CreateAiRunDto)
+@ApiExtraModels(
+	CreateAiRunDto,
+	TaskGenerationRunDto,
+	BoardSummaryRunDto,
+	ApplyAiRunDto,
+)
 @Controller("boards/:boardId/ai")
 export class AiController {
-	constructor(@Inject(AiRunsService) private readonly runs: AiRunsService) {}
+	constructor(
+		@Inject(AiRunsService) private readonly runs: AiRunsService,
+		@Inject(AiApplicationService)
+		private readonly applications: AiApplicationService,
+	) {}
 
 	@Post("task-generation-runs")
+	@ApiBody({ type: TaskGenerationRunDto })
 	@HttpCode(HttpStatus.ACCEPTED)
 	@ApiAcceptedResponse({ type: AiRunResponseDto })
 	@ApiConflictResponse({
@@ -51,12 +71,13 @@ export class AiController {
 	createTaskGenerationRun(
 		@CurrentBoardAccess() context: BoardAccessContext,
 		@Param("boardId", new ParseUUIDPipe({ version: "4" })) _boardId: string,
-		@Body() dto: CreateAiRunDto,
+		@Body() dto: TaskGenerationRunDto,
 	): Promise<AiRunResponse> {
 		return this.runs.create(context, AiOperationKind.TASK_GENERATION, dto);
 	}
 
 	@Post("summary-runs")
+	@ApiBody({ type: BoardSummaryRunDto })
 	@HttpCode(HttpStatus.ACCEPTED)
 	@ApiAcceptedResponse({ type: AiRunResponseDto })
 	@ApiConflictResponse({
@@ -70,9 +91,22 @@ export class AiController {
 	createSummaryRun(
 		@CurrentBoardAccess() context: BoardAccessContext,
 		@Param("boardId", new ParseUUIDPipe({ version: "4" })) _boardId: string,
-		@Body() dto: CreateAiRunDto,
+		@Body() dto: BoardSummaryRunDto,
 	): Promise<AiRunResponse> {
 		return this.runs.create(context, AiOperationKind.BOARD_SUMMARY, dto);
+	}
+
+	@Post("runs/:runId/apply")
+	@ApiBody({ type: ApplyAiRunDto })
+	@HttpCode(HttpStatus.OK)
+	@ApiOkResponse({ type: ApplyAiRunResponseDto })
+	@CheckBoardPermissions(BoardPermission.AI_RUN, BoardPermission.TASK_CREATE)
+	applyRun(
+		@CurrentBoardAccess() context: BoardAccessContext,
+		@Param("runId", new ParseUUIDPipe({ version: "4" })) runId: string,
+		@Body() dto: ApplyAiRunDto,
+	): Promise<ApplyAiRunResponseDto> {
+		return this.applications.apply(context, runId, dto);
 	}
 
 	@Get("runs/:runId")

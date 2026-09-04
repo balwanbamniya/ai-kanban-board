@@ -19,7 +19,10 @@ function setup(transaction: Record<string, unknown>) {
 				callback(transaction),
 		),
 	};
-	const boardAccess = { assertContextPermissions: vi.fn() };
+	const boardAccess = {
+		assertFreshContext: vi.fn().mockResolvedValue(undefined),
+		assertContextPermissions: vi.fn(),
+	};
 	return new TasksService(prisma as never, boardAccess as never);
 }
 

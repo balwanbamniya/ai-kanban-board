@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPrismaAdapter } from "../../database/prisma-client.js";
 import { PrismaClient } from "../../generated/prisma/client.js";
 import { AiOperationKind, AiRunStatus } from "../../generated/prisma/enums.js";
+import { BoardAccessService } from "../access-control/application/board-access.service.js";
+import { BoardAuthorizationPolicy } from "../access-control/application/board-authorization.policy.js";
 import { BoardRole } from "../access-control/domain/board-role.enum.js";
 import { AiRunsService } from "./application/ai-runs.service.js";
 
@@ -34,7 +36,7 @@ describe("AI run database concurrency", () => {
 		const service = createService(prisma);
 		const request = {
 			idempotencyKey: `integration:${randomUUID()}`,
-			input: { goal: "deduplicate me" },
+			input: { instructions: "deduplicate me", count: 5 },
 		};
 
 		try {
@@ -88,11 +90,11 @@ describe("AI run database concurrency", () => {
 			const results = await Promise.allSettled([
 				service.create(fixture.context, AiOperationKind.BOARD_SUMMARY, {
 					idempotencyKey: `quota:${randomUUID()}`,
-					input: { request: 1 },
+					input: { instructions: "summary one" },
 				}),
 				service.create(fixture.context, AiOperationKind.BOARD_SUMMARY, {
 					idempotencyKey: `quota:${randomUUID()}`,
-					input: { request: 2 },
+					input: { instructions: "summary two" },
 				}),
 			]);
 			expect(
@@ -115,7 +117,8 @@ describe("AI run database concurrency", () => {
 function createService(prisma: PrismaClient): AiRunsService {
 	return new AiRunsService(
 		prisma as never,
-		{ assertContextPermissions: () => undefined } as never,
+		new BoardAccessService(prisma as never, new BoardAuthorizationPolicy()),
+		{ openaiApiKey: "test", openaiModel: "test" } as never,
 	);
 }
 

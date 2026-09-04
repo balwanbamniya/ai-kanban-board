@@ -1,3 +1,4 @@
+import { requestStorage } from "../../../common/request-context/request-context.service.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
 
 export const TaskEventName = {
@@ -24,6 +25,7 @@ export async function recordTaskEvent(
 ): Promise<void> {
 	await transaction.activity.create({
 		data: {
+			requestId: requestStorage.getStore()?.requestId,
 			actorId: input.actorId,
 			boardId: input.boardId,
 			eventName: input.eventName,
@@ -33,6 +35,8 @@ export async function recordTaskEvent(
 	});
 	await transaction.outboxEvent.create({
 		data: {
+			boardId: input.boardId,
+			requestId: requestStorage.getStore()?.requestId,
 			aggregateId: input.taskId,
 			aggregateType: "task",
 			eventName: input.eventName,

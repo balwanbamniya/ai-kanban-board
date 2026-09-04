@@ -21,7 +21,9 @@
 		"start:debug": "nest start --debug --watch",
 		"start:prod": "node dist/main.js",
 		"test": "vitest run --config vitest.config.ts",
-		"test:integration": "vitest run --config vitest.integration.config.ts"
+		"test:integration": "vitest run --config vitest.integration.config.ts",
+		"test:ai:live": "tsx scripts/smoke-ai.ts",
+		"test:integration:local": "node scripts/integration-local.mjs"
 	},
 	"dependencies": {
 		"@clerk/backend": "3.17.1",
@@ -45,6 +47,7 @@
 		"dotenv": "17.4.2",
 		"fractional-indexing": "4.0.0",
 		"helmet": "8.3.0",
+		"openai": "7.9.0",
 		"pg": "8.23.0",
 		"pino-http": "11.0.0",
 		"redis": "6.2.1",

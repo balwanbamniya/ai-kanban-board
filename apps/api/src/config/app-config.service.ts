@@ -4,6 +4,18 @@ import type { Environment } from "./env.validation.js";
 export class AppConfigService {
 	constructor(private readonly config: ConfigService<Environment, true>) {}
 
+	get openaiApiKey(): string | undefined {
+		return this.config.get("OPENAI_API_KEY", { infer: true });
+	}
+	get openaiModel(): string | undefined {
+		return this.config.get("OPENAI_MODEL", { infer: true });
+	}
+	get workersEnabled(): boolean {
+		return (
+			this.config.get("WORKERS_ENABLED", { infer: true }) ??
+			this.environment !== "test"
+		);
+	}
 	get apiPrefix(): string {
 		return this.config.getOrThrow("API_PREFIX");
 	}

@@ -18,7 +18,7 @@ describe("PrismaService", () => {
 		const disconnect = vi.spyOn(prisma, "$disconnect").mockResolvedValue();
 
 		await prisma.onModuleInit();
-		await prisma.onModuleDestroy();
+		await prisma.onApplicationShutdown();
 
 		expect(connect).toHaveBeenCalledOnce();
 		expect(query).toHaveBeenCalledOnce();

@@ -38,6 +38,7 @@ const CURSOR_LIMIT_PER_SECOND = 20;
 const PRESENCE_REFRESH_MS = 20_000;
 
 type RealtimeSocketData = {
+	token: string;
 	cursorTimestamps: number[];
 	joinedBoards: Set<string>;
 	user: CurrentUser;
@@ -215,8 +216,30 @@ export class RealtimeGateway
 		}
 	}
 
-	emitBoardEvent(boardId: string, eventName: string, payload: unknown): void {
-		this.server.to(this.room(boardId)).emit(eventName, payload);
+	async emitBoardEvent(
+		boardId: string,
+		eventName: string,
+		payload: unknown,
+	): Promise<void> {
+		const sockets = await this.server.in(this.room(boardId)).fetchSockets();
+		for (const socket of sockets) {
+			try {
+				await this.authentication.authenticate(socket.data.token);
+				await this.boardAccess.assertPermissions(socket.data.user.id, boardId, [
+					BoardPermission.BOARD_READ,
+				]);
+			} catch (error) {
+				if (
+					error instanceof HttpException &&
+					[401, 403, 404].includes(error.getStatus())
+				) {
+					await socket.leave(this.room(boardId));
+					continue;
+				}
+				throw error;
+			}
+			socket.emit(eventName, payload);
+		}
 	}
 
 	onModuleDestroy(): void {
@@ -227,6 +250,7 @@ export class RealtimeGateway
 		const token = this.extractToken(socket);
 		const user = await this.authentication.authenticate(token);
 		socket.data = {
+			token,
 			cursorTimestamps: [],
 			joinedBoards: new Set(),
 			user,
@@ -269,7 +293,27 @@ export class RealtimeGateway
 		const operations: Array<Promise<void>> = [];
 		for (const socket of this.sockets.values()) {
 			for (const boardId of socket.data.joinedBoards) {
-				operations.push(this.presence.refresh(boardId, socket.id));
+				operations.push(
+					(async () => {
+						try {
+							await this.authentication.authenticate(socket.data.token);
+							await this.boardAccess.assertPermissions(
+								socket.data.user.id,
+								boardId,
+								[BoardPermission.BOARD_READ],
+							);
+							await this.presence.refresh(boardId, socket.id);
+						} catch {
+							await socket.leave(this.room(boardId));
+							socket.data.joinedBoards.delete(boardId);
+							await this.presence.leave(
+								boardId,
+								socket.id,
+								socket.data.user.id,
+							);
+						}
+					})(),
+				);
 			}
 		}
 		const results = await Promise.allSettled(operations);

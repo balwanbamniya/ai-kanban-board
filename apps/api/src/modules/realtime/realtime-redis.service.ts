@@ -2,7 +2,7 @@ import {
 	Inject,
 	Injectable,
 	Logger,
-	type OnModuleDestroy,
+	type OnApplicationShutdown,
 } from "@nestjs/common";
 import { createClient } from "redis";
 import { AppConfigService } from "../../config/app-config.service.js";
@@ -17,7 +17,7 @@ function createRedisClient(url: string) {
 type RedisClient = ReturnType<typeof createRedisClient>;
 
 @Injectable()
-export class RealtimeRedisService implements OnModuleDestroy {
+export class RealtimeRedisService implements OnApplicationShutdown {
 	private readonly logger = new Logger(RealtimeRedisService.name);
 	private commandClient?: RedisClient;
 	private publisherClient?: RedisClient;
@@ -45,7 +45,7 @@ export class RealtimeRedisService implements OnModuleDestroy {
 		return this.connectPromise;
 	}
 
-	async onModuleDestroy(): Promise<void> {
+	async onApplicationShutdown(): Promise<void> {
 		await Promise.allSettled(
 			[this.commandClient, this.publisherClient, this.subscriberClient]
 				.filter((client): client is RedisClient => Boolean(client))

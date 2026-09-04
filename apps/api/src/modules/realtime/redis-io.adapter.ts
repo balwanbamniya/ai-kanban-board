@@ -21,7 +21,7 @@ export class RedisIoAdapter extends IoAdapter {
 		const server = super.createIOServer(port, {
 			...options,
 			cors: {
-				credentials: true,
+				credentials: false,
 				origin: this.config.corsOrigins,
 			},
 		} as ServerOptions) as Server;

@@ -71,7 +71,7 @@ describe("realtime Redis transport", () => {
 		await Promise.all(
 			[firstRedis, secondRedis]
 				.filter((redis): redis is RealtimeRedisService => Boolean(redis))
-				.map((redis) => redis.onModuleDestroy()),
+				.map((redis) => redis.onApplicationShutdown()),
 		);
 	});
 

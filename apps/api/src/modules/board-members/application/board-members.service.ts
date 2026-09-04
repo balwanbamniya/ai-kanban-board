@@ -130,6 +130,20 @@ export class BoardMembersService {
 			BoardPermission.INVITATION_READ,
 		]);
 		const now = new Date();
+		if (query.cursor) {
+			const cursor = await this.prisma.boardInvitation.findFirst({
+				where: {
+					id: query.cursor,
+					boardId: context.boardId,
+					...this.invitationStatusFilter(query.status, now),
+				},
+				select: { id: true },
+			});
+			if (!cursor)
+				throw new BadRequestException(
+					"Invitation cursor is unavailable for this query.",
+				);
+		}
 		const invitations = await this.prisma.boardInvitation.findMany({
 			where: {
 				boardId: context.boardId,
@@ -159,6 +173,7 @@ export class BoardMembersService {
 		const now = new Date();
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			const board = await this.lockActiveBoard(transaction, context.boardId);
 			const expiredInvitation = await transaction.boardInvitation.findFirst({
 				where: {
@@ -259,6 +274,7 @@ export class BoardMembersService {
 		const now = new Date();
 
 		const result = await this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			const board = await this.lockActiveBoard(transaction, context.boardId);
 			const existing = await transaction.boardInvitation.findFirst({
 				where: { boardId: context.boardId, id: invitationId },
@@ -339,6 +355,7 @@ export class BoardMembersService {
 			BoardPermission.MEMBER_INVITE,
 		]);
 		const result = await this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const invitation = await transaction.boardInvitation.findFirst({
 				where: { boardId: context.boardId, id: invitationId },
@@ -412,7 +429,10 @@ export class BoardMembersService {
 			const invitation = await transaction.boardInvitation.findUniqueOrThrow({
 				where: { id: locatedInvitation.id },
 			});
-			if (invitation.status !== InvitationStatus.PENDING) {
+			if (
+				invitation.tokenHash !== this.hashToken(token) ||
+				invitation.status !== InvitationStatus.PENDING
+			) {
 				return { kind: "unavailable" as const };
 			}
 			if (invitation.expiresAt <= now) {
@@ -531,6 +551,7 @@ export class BoardMembersService {
 		role: BoardMembershipRole,
 	): Promise<MemberResponse> {
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const target = await transaction.boardMember.findFirst({
 				where: {
@@ -601,6 +622,7 @@ export class BoardMembersService {
 		targetUserId: string,
 	): Promise<void> {
 		await this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const target = await transaction.boardMember.findUnique({
 				where: {
@@ -651,6 +673,7 @@ export class BoardMembersService {
 		}
 
 		await this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const deletion = await transaction.boardMember.deleteMany({
 				where: { boardId: context.boardId, userId: context.userId },
@@ -684,6 +707,7 @@ export class BoardMembersService {
 		}
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			const board = await this.lockActiveBoard(transaction, context.boardId);
 			if (board.ownerId !== context.userId || board.version !== version) {
 				throw new ConflictException(

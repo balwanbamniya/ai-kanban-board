@@ -1,6 +1,6 @@
 # AI Kanban Board
 
-A portfolio-ready monorepo foundation for an AI-assisted Kanban application. The
+An AI-assisted Kanban application with a modular backend and frontend workspace. The
 workspace combines a server-rendered React frontend with a modular NestJS API.
 
 ## Stack
@@ -78,8 +78,11 @@ both user-visible activity and an outbox event for reliable downstream work.
 
 AI task-generation and board-summary endpoints accept durable work at
 `/api/v1/boards/:boardId/ai`. A successful `202 Accepted` response means the run
-has been persisted with `QUEUED` status; provider execution is intentionally
-handled by a future worker and is not performed by this API process.
+has been persisted with `QUEUED` status; PostgreSQL-backed workers execute it through OpenAI and persist a validated result.
+Generated tasks are reviewed before an atomic apply operation saves them.
+
+See [the backend API handoff](docs/backend-api.md) for setup, frontend flows,
+AI request examples, realtime contracts, and verification commands.
 
 ## Commands
 
@@ -105,9 +108,9 @@ pnpm --filter @repo/api db:seed
 pnpm --filter @repo/api db:studio
 ```
 
-Normal tests mock database access. To run the integration suite locally, start
-PostgreSQL, deploy the migrations, seed the fixtures, and then run
-`pnpm test:integration`.
+Normal tests mock database access. Run `pnpm --filter @repo/api test:integration:local` for disposable PostgreSQL
+and Redis fixtures. Direct integration runs require an isolated database ending
+in `_test` and a test Redis instance.
 
 ## Workspace
 

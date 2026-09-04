@@ -44,6 +44,7 @@ export class ColumnsService {
 		]);
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const last = await transaction.column.findFirst({
 				where: { boardId: context.boardId },
@@ -79,6 +80,7 @@ export class ColumnsService {
 		]);
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			const existing = await transaction.column.findFirst({
 				where: { boardId: context.boardId, id: columnId },
 				select: { title: true, version: true },
@@ -130,6 +132,7 @@ export class ColumnsService {
 		]);
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const current = await transaction.column.findMany({
 				where: { boardId: context.boardId },
@@ -196,6 +199,7 @@ export class ColumnsService {
 		]);
 
 		await this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const column = await transaction.column.findFirst({
 				where: { boardId: context.boardId, id: columnId },

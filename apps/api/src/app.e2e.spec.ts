@@ -1,11 +1,11 @@
-import type { INestApplication } from "@nestjs/common";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { Test } from "@nestjs/testing";
 import "reflect-metadata";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 describe("service foundation", () => {
-	let app: INestApplication;
+	let app: NestExpressApplication;
 	const queryDatabase = vi.fn().mockResolvedValue([{ ready: 1 }]);
 	const currentUser = {
 		email: "owner@example.com",
@@ -38,6 +38,7 @@ describe("service foundation", () => {
 	const leaveBoard = vi.fn().mockResolvedValue(undefined);
 
 	beforeAll(async () => {
+		vi.stubEnv("WORKERS_ENABLED", "false");
 		vi.stubEnv("API_PREFIX", "api/v1");
 		vi.stubEnv("CLERK_AUTHORIZED_PARTIES", "http://localhost:3000");
 		vi.stubEnv("CLERK_JWT_KEY", "test-public-key");
@@ -55,6 +56,9 @@ describe("service foundation", () => {
 		vi.stubEnv("PORT", "3001");
 		vi.stubEnv("REDIS_URL", "redis://localhost:6379");
 
+		const { RealtimeRedisService } = await import(
+			"./modules/realtime/realtime-redis.service.js"
+		);
 		const { AppModule } = await import("./app.module.js");
 		const { PrismaService } = await import("./database/prisma.service.js");
 		const { AuthenticationService } = await import(
@@ -73,6 +77,8 @@ describe("service foundation", () => {
 		const moduleRef = await Test.createTestingModule({
 			imports: [AppModule],
 		})
+			.overrideProvider(RealtimeRedisService)
+			.useValue({ command: { ping: vi.fn().mockResolvedValue("PONG") } })
 			.overrideProvider(PrismaService)
 			.useValue({
 				$queryRaw: queryDatabase,
@@ -114,13 +120,16 @@ describe("service foundation", () => {
 			})
 			.compile();
 
-		app = moduleRef.createNestApplication({ bufferLogs: true, rawBody: true });
+		app = moduleRef.createNestApplication<NestExpressApplication>({
+			bufferLogs: true,
+			rawBody: true,
+		});
 		configureApplication(app);
 		await app.init();
 	});
 
 	afterAll(async () => {
-		await app.close();
+		await app?.close();
 		vi.unstubAllEnvs();
 	});
 
@@ -163,7 +172,13 @@ describe("service foundation", () => {
 		await request(app.getHttpServer())
 			.get("/api/v1/health/ready")
 			.expect(503)
-			.expect({ status: "error" });
+			.expect(({ body }) => {
+				expect(body).toMatchObject({
+					status: 503,
+					detail: "An unexpected error occurred.",
+				});
+				expect(JSON.stringify(body)).not.toContain("sensitive");
+			});
 	});
 
 	it("serves an OpenAPI document outside production", async () => {
@@ -278,5 +293,76 @@ describe("service foundation", () => {
 			.send({ type: "session.created" })
 			.expect(204);
 		expect(processWebhook).toHaveBeenCalledOnce();
+	});
+	it("returns correlated problem details and validation messages", async () => {
+		await request(app.getHttpServer())
+			.post("/api/v1/boards")
+			.set("authorization", "Bearer session-token")
+			.set("x-request-id", "validation-123")
+			.send({ title: "" })
+			.expect(400)
+			.expect("content-type", /application\/problem\+json/)
+			.expect(({ body, headers }) => {
+				expect(body.requestId).toBe(headers["x-request-id"]);
+				expect(body.requestId).toBe("validation-123");
+				expect(body.errors.length).toBeGreaterThan(0);
+			});
+	});
+	it("rejects malformed JSON and oversized bodies as client errors", async () => {
+		await request(app.getHttpServer())
+			.post("/api/v1/boards")
+			.set("authorization", "Bearer session-token")
+			.set("content-type", "application/json")
+			.send("{invalid")
+			.expect(400);
+		await request(app.getHttpServer())
+			.post("/api/v1/boards")
+			.set("authorization", "Bearer session-token")
+			.send({ title: "x".repeat(1024 * 1024) })
+			.expect(413);
+	});
+	it("exposes request IDs only to configured browser origins", async () => {
+		await request(app.getHttpServer())
+			.get("/health")
+			.set("origin", "http://localhost:3000")
+			.expect("access-control-allow-origin", "http://localhost:3000")
+			.expect("access-control-expose-headers", "x-request-id");
+		await request(app.getHttpServer())
+			.get("/health")
+			.set("origin", "https://untrusted.example")
+			.expect(({ headers }) => {
+				expect(headers["access-control-allow-origin"]).toBeUndefined();
+			});
+	});
+	it("preserves exact JSON bytes for webhook verification", async () => {
+		const body = '{ "type" : "session.created" }';
+		await request(app.getHttpServer())
+			.post("/api/v1/webhooks/clerk")
+			.set("content-type", "application/json")
+			.send(body)
+			.expect(204);
+		const args = processWebhook.mock.calls.at(-1);
+		if (!(args?.[0] instanceof Request))
+			throw new Error("Webhook request missing");
+		expect(await args[0].text()).toBe(body);
+	});
+	it("validates AI application bodies before accessing the service", async () => {
+		await request(app.getHttpServer())
+			.post(
+				`/api/v1/boards/${boardId}/ai/runs/40000000-0000-4000-8000-000000000001/apply`,
+			)
+			.set("authorization", "Bearer session-token")
+			.send({})
+			.expect(400);
+		await request(app.getHttpServer())
+			.get("/docs-json")
+			.expect(({ body }) => {
+				for (const name of [
+					"TaskGenerationRunDto",
+					"BoardSummaryRunDto",
+					"ApplyAiRunDto",
+				])
+					expect(body.components.schemas[name]).toBeDefined();
+			});
 	});
 });

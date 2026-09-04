@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
 	IsBoolean,
@@ -6,11 +7,13 @@ import {
 	IsUUID,
 	Max,
 	Min,
+	ValidateIf,
 } from "class-validator";
 
 export class ListBoardsQueryDto {
-	@IsOptional()
+	@ValidateIf((_object, value: unknown) => value !== undefined)
 	@IsUUID("4")
+	@ApiPropertyOptional({ type: String })
 	cursor?: string;
 
 	@Type(() => Number)
@@ -18,6 +21,7 @@ export class ListBoardsQueryDto {
 	@IsInt()
 	@Min(1)
 	@Max(100)
+	@ApiPropertyOptional({ type: Number, default: 25 })
 	limit = 25;
 
 	@Transform(({ value }: { value: unknown }) => {
@@ -27,5 +31,6 @@ export class ListBoardsQueryDto {
 	})
 	@IsOptional()
 	@IsBoolean()
+	@ApiPropertyOptional({ type: Boolean, default: false })
 	includeArchived = false;
 }

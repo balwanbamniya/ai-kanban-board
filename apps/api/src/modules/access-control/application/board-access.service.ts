@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { isUUID } from "class-validator";
 import { PrismaService } from "../../../database/prisma.service.js";
+import { Prisma } from "../../../generated/prisma/client.js";
 import { BoardRole as PersistedBoardRole } from "../../../generated/prisma/enums.js";
 import type { BoardAccessContext } from "../domain/board-access-context.js";
 import {
@@ -35,13 +36,17 @@ export class BoardAccessService {
 	async getContext(
 		userId: string,
 		boardId: string,
+		db: Prisma.TransactionClient = this.prisma,
 	): Promise<BoardAccessContext> {
 		this.assertUuid(boardId, "Board ID");
 
-		const board = await this.prisma.board.findFirst({
+		const board = await db.board.findFirst({
 			where: {
 				id: boardId,
-				OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+				OR: [
+					{ ownerId: userId, owner: { deletedAt: null } },
+					{ members: { some: { userId, user: { deletedAt: null } } } },
+				],
 			},
 			select: {
 				archivedAt: true,
@@ -74,6 +79,34 @@ export class BoardAccessService {
 			role,
 			userId,
 		};
+	}
+
+	async assertFreshContext(
+		transaction: Prisma.TransactionClient,
+		context: BoardAccessContext,
+	): Promise<void> {
+		await transaction.$queryRaw(
+			Prisma.sql`SELECT id FROM boards WHERE id = CAST(${context.boardId} AS uuid) FOR UPDATE`,
+		);
+		const current = await this.getContext(
+			context.userId,
+			context.boardId,
+			transaction,
+		);
+		const user = await transaction.user.findFirst({
+			where: { id: context.userId, deletedAt: null },
+			select: { id: true },
+		});
+		if (!user) throw new ForbiddenException("User is no longer active.");
+		if (
+			current.role !== context.role ||
+			current.ownerId !== context.ownerId ||
+			current.archivedAt?.getTime() !== context.archivedAt?.getTime()
+		) {
+			throw new ConflictException(
+				"Board access changed. Refresh and try again.",
+			);
+		}
 	}
 
 	async assertPermissions(

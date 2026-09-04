@@ -27,7 +27,7 @@ const run = {
 	errorMessage: null,
 	id: "40000000-0000-4000-8000-000000000001",
 	idempotencyKey: "generate:1",
-	input: { goal: "release" },
+	input: { instructions: "release", count: 5 },
 	latencyMs: null,
 	model: null,
 	operationKind: AiOperationKind.TASK_GENERATION,
@@ -60,10 +60,17 @@ function setup(overrides: Record<string, unknown> = {}) {
 		),
 		aiRun: { findFirst: vi.fn() },
 	};
-	const boardAccess = { assertContextPermissions: vi.fn() };
+	const boardAccess = {
+		assertFreshContext: vi.fn().mockResolvedValue(undefined),
+		assertContextPermissions: vi.fn(),
+	};
 	return {
 		prisma,
-		service: new AiRunsService(prisma as never, boardAccess as never),
+		service: new AiRunsService(
+			prisma as never,
+			boardAccess as never,
+			{ openaiApiKey: "test", openaiModel: "test" } as never,
+		),
 		transaction,
 	};
 }
@@ -79,6 +86,7 @@ describe("AiRunsService", () => {
 			}),
 		).resolves.toBe(run);
 		expect(transaction.aiRun.create).toHaveBeenCalledWith({
+			select: expect.any(Object),
 			data: expect.objectContaining({
 				model: null,
 				provider: null,
@@ -100,7 +108,7 @@ describe("AiRunsService", () => {
 		await expect(
 			service.create(context, AiOperationKind.TASK_GENERATION, {
 				idempotencyKey: run.idempotencyKey,
-				input: { goal: "release" },
+				input: { instructions: "release", count: 5 },
 			}),
 		).resolves.toBe(run);
 		expect(aiRun.count).not.toHaveBeenCalled();
@@ -120,7 +128,7 @@ describe("AiRunsService", () => {
 		},
 		{
 			actorId: run.actorId,
-			input: { goal: "different" },
+			input: { instructions: "different", count: 5 },
 			operationKind: run.operationKind,
 		},
 	])("rejects non-equivalent idempotency-key reuse", async (existing) => {

@@ -45,7 +45,13 @@ export class TasksService {
 		]);
 		if (query.cursor) {
 			const cursor = await this.prisma.task.findFirst({
-				where: { boardId: context.boardId, id: query.cursor },
+				where: {
+					boardId: context.boardId,
+					id: query.cursor,
+					assigneeId: query.assigneeId,
+					columnId: query.columnId,
+					priority: query.priority,
+				},
 				select: { id: true },
 			});
 			if (!cursor) {
@@ -84,6 +90,7 @@ export class TasksService {
 			BoardPermission.TASK_CREATE,
 		]);
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			await this.assertReferences(transaction, context.boardId, dto);
 			const last = await transaction.task.findFirst({
@@ -147,6 +154,7 @@ export class TasksService {
 		}
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const existing = await transaction.task.findFirst({
 				where: { boardId: context.boardId, id: taskId },
@@ -233,6 +241,7 @@ export class TasksService {
 			BoardPermission.TASK_MOVE,
 		]);
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const existing = await transaction.task.findFirst({
 				where: { boardId: context.boardId, id: taskId },
@@ -250,7 +259,7 @@ export class TasksService {
 					"Destination column does not belong to this board.",
 				);
 			}
-			if (existing.columnId === destination.id) {
+			if (existing.columnId === destination.id && !dto.beforeTaskId) {
 				const laterTask = await transaction.task.findFirst({
 					where: {
 						columnId: destination.id,
@@ -263,12 +272,39 @@ export class TasksService {
 					throw new BadRequestException("Task is already last in this column.");
 				}
 			}
+			if (dto.beforeTaskId === taskId)
+				throw new BadRequestException("A task cannot be placed before itself.");
+			const next = dto.beforeTaskId
+				? await transaction.task.findFirst({
+						where: { id: dto.beforeTaskId, columnId: destination.id },
+						select: { sortKey: true },
+					})
+				: null;
+			if (dto.beforeTaskId && !next)
+				throw new BadRequestException(
+					"beforeTaskId must belong to the destination column.",
+				);
 			const last = await transaction.task.findFirst({
-				where: { columnId: destination.id, id: { not: taskId } },
+				where: {
+					columnId: destination.id,
+					id: { not: taskId },
+					...(next ? { sortKey: { lt: next.sortKey } } : {}),
+				},
 				orderBy: { sortKey: "desc" },
 				select: { id: true, sortKey: true },
 			});
-			const sortKey = generateKeyBetween(last?.sortKey ?? null, null);
+			if (
+				next &&
+				existing.columnId === destination.id &&
+				existing.sortKey < next.sortKey &&
+				(!last || last.sortKey < existing.sortKey)
+			)
+				throw new BadRequestException("Task is already in this position.");
+			const sortKey = generateKeyBetween(
+				last?.sortKey ?? null,
+				next?.sortKey ?? null,
+			);
+
 			const update = await transaction.task.updateMany({
 				where: { boardId: context.boardId, id: taskId, version: dto.version },
 				data: {
@@ -309,6 +345,7 @@ export class TasksService {
 			BoardPermission.TASK_DELETE,
 		]);
 		await this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			const task = await transaction.task.findFirst({
 				where: { boardId: context.boardId, id: taskId },

@@ -1,3 +1,4 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { IsIn } from "class-validator";
 import {
 	type BoardMembershipRole,
@@ -6,5 +7,6 @@ import {
 
 export class UpdateMemberRoleDto {
 	@IsIn(boardMembershipRoles)
+	@ApiProperty({ enum: boardMembershipRoles })
 	role!: BoardMembershipRole;
 }

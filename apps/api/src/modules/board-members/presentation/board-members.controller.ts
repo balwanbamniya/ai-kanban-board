@@ -65,6 +65,7 @@ export class BoardMembersController {
 	) {}
 
 	@Post("invitations/accept")
+	@HttpCode(HttpStatus.OK)
 	@ApiConflictResponse({ description: "The invitation is no longer usable." })
 	@ApiOkResponse({ type: InvitationResponseDto })
 	accept(
@@ -108,6 +109,7 @@ export class BoardMembersController {
 	}
 
 	@Post("boards/:boardId/invitations/:invitationId/resend")
+	@HttpCode(HttpStatus.OK)
 	@ApiConflictResponse({ description: "The invitation is no longer usable." })
 	@ApiOkResponse({ type: InvitationTokenResponseDto })
 	@CheckBoardPermissions(BoardPermission.MEMBER_INVITE)

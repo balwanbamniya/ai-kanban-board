@@ -20,19 +20,30 @@ jobs:
     timeout-minutes: 15
 
     env:
-      DATABASE_URL: postgresql://ai_kanban:ai_kanban@localhost:5432/ai_kanban?schema=public
+      REDIS_URL: redis://localhost:6379
+      WORKERS_ENABLED: "false"
+      DATABASE_URL: postgresql://ai_kanban:ai_kanban@localhost:5432/ai_kanban_test?schema=public
 
     services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: ai_kanban
+          POSTGRES_DB: ai_kanban_test
           POSTGRES_PASSWORD: ai_kanban
           POSTGRES_USER: ai_kanban
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ai_kanban -d ai_kanban"
+          --health-cmd "pg_isready -U ai_kanban -d ai_kanban_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 12

@@ -4,6 +4,11 @@
 		"incremental": false,
 		"noEmit": true
 	},
-	"include": ["prisma.config.ts", "prisma/**/*.ts", "vitest*.ts"],
+	"include": [
+		"prisma.config.ts",
+		"prisma/**/*.ts",
+		"vitest*.ts",
+		"scripts/**/*.ts"
+	],
 	"exclude": ["node_modules"]
 }

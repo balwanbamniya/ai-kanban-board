@@ -74,6 +74,12 @@ const environmentSchema = telemetryEnvironmentSchema.extend({
 		.max(60_000)
 		.default(5000),
 	REDIS_URL: redisUrlSchema,
+	OPENAI_API_KEY: z.string().trim().min(1).optional(),
+	OPENAI_MODEL: z.string().trim().min(1).optional(),
+	WORKERS_ENABLED: z
+		.enum(["true", "false"])
+		.optional()
+		.transform((v) => (v === undefined ? undefined : v === "true")),
 
 	CLERK_SECRET_KEY: z.string().trim().min(1),
 	CLERK_JWT_KEY: z

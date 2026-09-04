@@ -79,6 +79,20 @@ export class BoardsService {
 		userId: string,
 		query: ListBoardsQueryDto,
 	): Promise<{ boards: BoardListItem[]; nextCursor: string | null }> {
+		if (query.cursor) {
+			const cursor = await this.prisma.board.findFirst({
+				where: {
+					id: query.cursor,
+					archivedAt: query.includeArchived ? undefined : null,
+					OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+				},
+				select: { id: true },
+			});
+			if (!cursor)
+				throw new BadRequestException(
+					"Board cursor is unavailable for this query.",
+				);
+		}
 		const boards = await this.prisma.board.findMany({
 			where: {
 				archivedAt: query.includeArchived ? undefined : null,
@@ -223,6 +237,7 @@ export class BoardsService {
 		}
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			const result = await transaction.board.updateMany({
 				where: {
 					archivedAt: null,
@@ -286,6 +301,7 @@ export class BoardsService {
 		archive: boolean,
 	): Promise<BoardResponse> {
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			const result = await transaction.board.updateMany({
 				where: {
 					archivedAt: archive ? null : { not: null },

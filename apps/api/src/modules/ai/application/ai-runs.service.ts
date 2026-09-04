@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import {
+	BadRequestException,
 	ConflictException,
 	HttpException,
 	HttpStatus,
@@ -7,7 +8,9 @@ import {
 	Injectable,
 	NotFoundException,
 	PayloadTooLargeException,
+	ServiceUnavailableException,
 } from "@nestjs/common";
+import { AppConfigService } from "../../../config/app-config.service.js";
 import { PrismaService } from "../../../database/prisma.service.js";
 import { Prisma } from "../../../generated/prisma/client.js";
 import {
@@ -19,13 +22,40 @@ import type { BoardAccessContext } from "../../access-control/domain/board-acces
 import { BoardPermission } from "../../access-control/domain/board-permission.enum.js";
 import type { CreateAiRunDto } from "../presentation/dto/create-ai-run.dto.js";
 import { AiEventName, recordAiEvent } from "./ai-events.js";
+import { generationInput, summaryInput } from "./ai-schemas.js";
 
 const MAX_BOARD_RUNS_PER_WINDOW = 100;
 const MAX_USER_RUNS_PER_WINDOW = 25;
 const MAX_INPUT_BYTES = 32 * 1_024;
 const QUOTA_WINDOW_MS = 24 * 60 * 60 * 1_000;
 
-export type AiRunResponse = Prisma.AiRunGetPayload<Record<string, never>>;
+const aiRunSelect = {
+	id: true,
+	actorId: true,
+	boardId: true,
+	completedAt: true,
+	createdAt: true,
+	errorMessage: true,
+	idempotencyKey: true,
+	input: true,
+	latencyMs: true,
+	model: true,
+	operationKind: true,
+	output: true,
+	promptVersion: true,
+	provider: true,
+	startedAt: true,
+	status: true,
+	updatedAt: true,
+	usage: true,
+	suggestions: {
+		select: { suggestionIndex: true, taskId: true },
+		orderBy: { suggestionIndex: "asc" },
+	},
+} satisfies Prisma.AiRunSelect;
+export type AiRunResponse = Prisma.AiRunGetPayload<{
+	select: typeof aiRunSelect;
+}>;
 
 @Injectable()
 export class AiRunsService {
@@ -33,6 +63,7 @@ export class AiRunsService {
 		@Inject(PrismaService) private readonly prisma: PrismaService,
 		@Inject(BoardAccessService)
 		private readonly boardAccess: BoardAccessService,
+		@Inject(AppConfigService) private readonly config: AppConfigService,
 	) {}
 
 	async create(
@@ -44,13 +75,23 @@ export class AiRunsService {
 			BoardPermission.AI_RUN,
 		]);
 		this.assertInputSize(dto.input);
+		const parsed = (
+			operationKind === "TASK_GENERATION" ? generationInput : summaryInput
+		).safeParse(dto.input);
+		if (!parsed.success)
+			throw new BadRequestException(parsed.error.issues.map((i) => i.message));
+		if (!this.config.openaiApiKey || !this.config.openaiModel)
+			throw new ServiceUnavailableException("AI is not configured.");
+		dto = { ...dto, input: parsed.data };
 
 		return this.prisma.$transaction(async (transaction) => {
+			await this.boardAccess.assertFreshContext(transaction, context);
 			await this.lockActiveBoard(transaction, context.boardId);
 			await transaction.$executeRaw(
 				Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${context.userId}, 0))`,
 			);
 			const existing = await transaction.aiRun.findUnique({
+				select: aiRunSelect,
 				where: {
 					boardId_idempotencyKey: {
 						boardId: context.boardId,
@@ -88,6 +129,7 @@ export class AiRunsService {
 			}
 
 			const run = await transaction.aiRun.create({
+				select: aiRunSelect,
 				data: {
 					actorId: context.userId,
 					boardId: context.boardId,
@@ -119,6 +161,7 @@ export class AiRunsService {
 			BoardPermission.AI_RUN,
 		]);
 		const run = await this.prisma.aiRun.findFirst({
+			select: aiRunSelect,
 			where: { boardId: context.boardId, id: runId },
 		});
 		if (!run) throw new NotFoundException("AI run not found.");

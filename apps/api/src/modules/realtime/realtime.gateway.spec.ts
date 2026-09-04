@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import { RealtimeGateway } from "./realtime.gateway.js";
 
@@ -95,5 +96,26 @@ describe("RealtimeGateway", () => {
 			ok: true,
 		});
 		expect(roomEmit).not.toHaveBeenCalled();
+	});
+	it("revalidates every recipient and removes revoked sockets before delivery", async () => {
+		const { gateway, boardAccess } = setup();
+		const allowed = socket(),
+			revoked = socket();
+		boardAccess.assertPermissions
+			.mockResolvedValueOnce({})
+			.mockRejectedValueOnce(new ForbiddenException());
+		gateway.server = {
+			in: vi.fn().mockReturnValue({
+				fetchSockets: vi.fn().mockResolvedValue([allowed, revoked]),
+			}),
+		} as never;
+		await gateway.emitBoardEvent(boardId, "task.created", {
+			eventId: "event-1",
+		});
+		expect(allowed.emit).toHaveBeenCalledWith("task.created", {
+			eventId: "event-1",
+		});
+		expect(revoked.emit).not.toHaveBeenCalled();
+		expect(revoked.leave).toHaveBeenCalledWith(`board:${boardId}`);
 	});
 });

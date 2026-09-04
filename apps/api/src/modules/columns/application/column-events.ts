@@ -1,3 +1,4 @@
+import { requestStorage } from "../../../common/request-context/request-context.service.js";
 import type { Prisma } from "../../../generated/prisma/client.js";
 
 export const ColumnEventName = {
@@ -25,6 +26,7 @@ export async function recordColumnEvent(
 ): Promise<void> {
 	await transaction.activity.create({
 		data: {
+			requestId: requestStorage.getStore()?.requestId,
 			actorId: input.actorId,
 			boardId: input.boardId,
 			eventName: input.eventName,
@@ -34,6 +36,8 @@ export async function recordColumnEvent(
 	});
 	await transaction.outboxEvent.create({
 		data: {
+			boardId: input.boardId,
+			requestId: requestStorage.getStore()?.requestId,
 			aggregateId: input.aggregateId,
 			aggregateType: "column",
 			eventName: input.eventName,

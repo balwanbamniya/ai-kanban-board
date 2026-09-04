@@ -1,3 +1,4 @@
+import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { IsEmail, IsString, MaxLength } from "class-validator";
 
@@ -8,5 +9,6 @@ export class ResolveUserQueryDto {
 	@IsString()
 	@IsEmail()
 	@MaxLength(254)
+	@ApiProperty({ type: String })
 	email!: string;
 }

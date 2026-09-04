@@ -5,7 +5,13 @@ import {
 	AiRunStatus,
 } from "../../../../generated/prisma/enums.js";
 
+export class AppliedSuggestionDto {
+	@ApiProperty() suggestionIndex!: number;
+	@ApiProperty({ format: "uuid" }) taskId!: string;
+}
 export class AiRunResponseDto {
+	@ApiProperty({ type: [AppliedSuggestionDto] })
+	suggestions!: AppliedSuggestionDto[];
 	@ApiPropertyOptional({ format: "uuid" })
 	actorId!: string | null;
 

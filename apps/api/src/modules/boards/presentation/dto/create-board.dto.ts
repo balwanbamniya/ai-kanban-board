@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import {
 	IsOptional,
@@ -5,6 +6,7 @@ import {
 	Matches,
 	MaxLength,
 	MinLength,
+	ValidateIf,
 } from "class-validator";
 
 export class CreateBoardDto {
@@ -14,6 +16,7 @@ export class CreateBoardDto {
 	@IsString()
 	@MinLength(1)
 	@MaxLength(120)
+	@ApiProperty({ type: String })
 	title!: string;
 
 	@Transform(({ value }: { value: unknown }) =>
@@ -22,13 +25,15 @@ export class CreateBoardDto {
 	@IsOptional()
 	@IsString()
 	@MaxLength(2_000)
+	@ApiPropertyOptional({ type: String })
 	description?: string | null;
 
-	@IsOptional()
+	@ValidateIf((_object, value: unknown) => value !== undefined)
 	@IsString()
 	@Matches(/^#[0-9a-fA-F]{6}$/)
 	@Transform(({ value }: { value: unknown }) =>
 		typeof value === "string" ? value.toLowerCase() : value,
 	)
+	@ApiPropertyOptional({ type: String })
 	color?: string;
 }

@@ -21,7 +21,10 @@ describe("ActivityService", () => {
 		const prisma = {
 			activity: { findMany: vi.fn().mockResolvedValue(rows) },
 		};
-		const boardAccess = { assertContextPermissions: vi.fn() };
+		const boardAccess = {
+			assertFreshContext: vi.fn().mockResolvedValue(undefined),
+			assertContextPermissions: vi.fn(),
+		};
 		const service = new ActivityService(prisma as never, boardAccess as never);
 
 		await expect(service.list(context, { limit: 2 })).resolves.toEqual({
@@ -43,7 +46,10 @@ describe("ActivityService", () => {
 		};
 		const service = new ActivityService(
 			prisma as never,
-			{ assertContextPermissions: vi.fn() } as never,
+			{
+				assertFreshContext: vi.fn().mockResolvedValue(undefined),
+				assertContextPermissions: vi.fn(),
+			} as never,
 		);
 
 		await expect(

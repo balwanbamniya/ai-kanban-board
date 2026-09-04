@@ -19,7 +19,7 @@
 		},
 		"test:integration": {
 			"dependsOn": ["generate"],
-			"passThroughEnv": ["DATABASE_URL"]
+			"passThroughEnv": ["DATABASE_URL", "REDIS_URL", "WORKERS_ENABLED"]
 		}
 	}
 }
