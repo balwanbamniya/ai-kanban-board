@@ -51,8 +51,10 @@ describe("workspace", () => {
 		renderPage(<Dashboard />);
 		expect(await screen.findByText("A real project")).toBeInTheDocument();
 		expect(fetcher.mock.calls[0]?.[0]).toContain("/users/me");
-		expect(fetcher.mock.calls[1]?.[0]).toContain("/boards?limit=12");
-		fireEvent.click(screen.getByRole("button", { name: /More possibilities/ }));
+		expect(fetcher.mock.calls[1]?.[0]).toContain(
+			"/boards?includeArchived=true&limit=100",
+		);
+
 		expect(await screen.findByText("Next project")).toBeInTheDocument();
 		expect(fetcher.mock.calls[2]?.[0]).toContain("cursor=next-id");
 		expect(
@@ -102,23 +104,14 @@ describe("workspace", () => {
 		).toBeInTheDocument();
 		expect(fetcher).not.toHaveBeenCalled();
 	});
-	it("loads a board overview only when expanded", async () => {
-		const fetcher = vi.fn().mockResolvedValue(
-			json({
-				board,
-				columns: [{ id: "c1", title: "To do" }],
-				members: [{ id: "m1" }],
-			}),
-		);
+	it("links directly to the full board without fetching an overview", async () => {
+		const fetcher = vi.fn();
 		vi.stubGlobal("fetch", fetcher);
 		renderPage(<BoardCard board={board} />);
-		const expand = await screen.findByRole("button", {
-			name: "Board overview",
-		});
+		expect(
+			await screen.findByRole("link", { name: /Open board/ }),
+		).toHaveAttribute("href", "/board/board-1");
 		expect(fetcher).not.toHaveBeenCalled();
-		fireEvent.click(expand);
-		expect(await screen.findByText("To do")).toBeInTheDocument();
-		expect(expand).toHaveAttribute("aria-expanded", "true");
 	});
 	it("validates, trims, and prevents concurrent board creation", async () => {
 		let resolve!: (response: Response) => void;

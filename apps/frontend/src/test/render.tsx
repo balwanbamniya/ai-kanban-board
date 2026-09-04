@@ -9,7 +9,10 @@ import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 export function renderPage(element: ReactNode) {
 	const client = new QueryClient({
-		defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+		defaultOptions: {
+			queries: { retry: false, staleTime: 30_000 },
+			mutations: { retry: false },
+		},
 	});
 	const route = createRootRoute({ component: () => element });
 	const router = createRouter({

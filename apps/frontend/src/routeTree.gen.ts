@@ -11,9 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as R404RouteImport } from './routes/404'
+import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as InviteRouteImport } from './routes/invite'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MyTasksRouteImport } from './routes/my-tasks'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TeamRouteImport } from './routes/team'
+import { Route as BoardBoardIdRouteImport } from './routes/board.$boardId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -25,9 +31,19 @@ const R404Route = R404RouteImport.update({
   path: '/404',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteRoute = InviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -35,48 +51,126 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MyTasksRoute = MyTasksRouteImport.update({
+  id: '/my-tasks',
+  path: '/my-tasks',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TeamRoute = TeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BoardBoardIdRoute = BoardBoardIdRouteImport.update({
+  id: '/board/$boardId',
+  path: '/board/$boardId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRoute
+  '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/my-tasks': typeof MyTasksRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
+  '/team': typeof TeamRoute
+  '/board/$boardId': typeof BoardBoardIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRoute
+  '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/my-tasks': typeof MyTasksRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
+  '/team': typeof TeamRoute
+  '/board/$boardId': typeof BoardBoardIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/404': typeof R404Route
+  '/calendar': typeof CalendarRoute
   '/dashboard': typeof DashboardRoute
+  '/invite': typeof InviteRoute
   '/login': typeof LoginRoute
+  '/my-tasks': typeof MyTasksRoute
   '/register': typeof RegisterRoute
+  '/settings': typeof SettingsRoute
+  '/team': typeof TeamRoute
+  '/board/$boardId': typeof BoardBoardIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/404' | '/dashboard' | '/login' | '/register'
+  fullPaths:
+    | '/'
+    | '/404'
+    | '/calendar'
+    | '/dashboard'
+    | '/invite'
+    | '/login'
+    | '/my-tasks'
+    | '/register'
+    | '/settings'
+    | '/team'
+    | '/board/$boardId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/404' | '/dashboard' | '/login' | '/register'
-  id: '__root__' | '/' | '/404' | '/dashboard' | '/login' | '/register'
+  to:
+    | '/'
+    | '/404'
+    | '/calendar'
+    | '/dashboard'
+    | '/invite'
+    | '/login'
+    | '/my-tasks'
+    | '/register'
+    | '/settings'
+    | '/team'
+    | '/board/$boardId'
+  id:
+    | '__root__'
+    | '/'
+    | '/404'
+    | '/calendar'
+    | '/dashboard'
+    | '/invite'
+    | '/login'
+    | '/my-tasks'
+    | '/register'
+    | '/settings'
+    | '/team'
+    | '/board/$boardId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   R404Route: typeof R404Route
+  CalendarRoute: typeof CalendarRoute
   DashboardRoute: typeof DashboardRoute
+  InviteRoute: typeof InviteRoute
   LoginRoute: typeof LoginRoute
+  MyTasksRoute: typeof MyTasksRoute
   RegisterRoute: typeof RegisterRoute
+  SettingsRoute: typeof SettingsRoute
+  TeamRoute: typeof TeamRoute
+  BoardBoardIdRoute: typeof BoardBoardIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -95,11 +189,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof R404RouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite': {
+      id: '/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -109,11 +217,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-tasks': {
+      id: '/my-tasks'
+      path: '/my-tasks'
+      fullPath: '/my-tasks'
+      preLoaderRoute: typeof MyTasksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/register': {
       id: '/register'
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/team': {
+      id: '/team'
+      path: '/team'
+      fullPath: '/team'
+      preLoaderRoute: typeof TeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/board/$boardId': {
+      id: '/board/$boardId'
+      path: '/board/$boardId'
+      fullPath: '/board/$boardId'
+      preLoaderRoute: typeof BoardBoardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -122,9 +258,15 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   R404Route: R404Route,
+  CalendarRoute: CalendarRoute,
   DashboardRoute: DashboardRoute,
+  InviteRoute: InviteRoute,
   LoginRoute: LoginRoute,
+  MyTasksRoute: MyTasksRoute,
   RegisterRoute: RegisterRoute,
+  SettingsRoute: SettingsRoute,
+  TeamRoute: TeamRoute,
+  BoardBoardIdRoute: BoardBoardIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

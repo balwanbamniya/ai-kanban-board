@@ -15,16 +15,28 @@ for (const [path, status, content] of [
 	assert.ok((await response.text()).includes(content), `${path} page content`);
 	console.log(`PASS ${path}: ${status}`);
 }
-const dashboard = await fetch(new URL("/dashboard", origin), {
-	redirect: "manual",
-	signal: AbortSignal.timeout(15000),
-});
-assert.equal(dashboard.status, 307);
-assert.equal(
-	new URL(dashboard.headers.get("location"), origin).pathname,
-	"/login",
-);
-console.log("PASS /dashboard: signed-out redirect");
+for (const path of [
+	"/dashboard",
+	"/my-tasks",
+	"/calendar",
+	"/team",
+	"/settings",
+	"/board/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+]) {
+	const response = await fetch(new URL(path, origin), {
+		redirect: "manual",
+		signal: AbortSignal.timeout(15000),
+	});
+	assert.equal(response.status, 307, path);
+	assert.equal(
+		new URL(response.headers.get("location"), origin).pathname,
+		"/login",
+	);
+	console.log(`PASS ${path}: signed-out redirect`);
+}
+const invite = await fetch(new URL("/invite", origin));
+assert.equal(invite.status, 200);
+console.log("PASS /invite: public sign-in continuation");
 const unsafe = await fetch(
 	new URL("/login?redirect=https%3A%2F%2Fexample.org", origin),
 	{ redirect: "manual", signal: AbortSignal.timeout(15000) },

@@ -1,11 +1,12 @@
 import { SignIn, SignUp } from "@clerk/tanstack-react-start";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { ArrowLeft, Check, Sparkles } from "lucide-react";
-import { authConfigured } from "../lib/auth";
+import { authConfigured, safeDestination } from "../lib/auth";
 import { useIdentity } from "./providers";
 import { Brand, Loading } from "./ui";
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
 	const login = mode === "login";
+	const destination = safeDestination(useLocation().search.redirect);
 	const { isLoaded } = useIdentity();
 	return (
 		<main id="main-content" className="auth-layout">
@@ -76,14 +77,14 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 						login ? (
 							<SignIn
 								routing="hash"
-								signUpUrl="/register"
-								forceRedirectUrl="/dashboard"
+								signUpUrl={`/register?redirect=${encodeURIComponent(destination)}`}
+								forceRedirectUrl={destination}
 							/>
 						) : (
 							<SignUp
 								routing="hash"
-								signInUrl="/login"
-								forceRedirectUrl="/dashboard"
+								signInUrl={`/login?redirect=${encodeURIComponent(destination)}`}
+								forceRedirectUrl={destination}
 							/>
 						)
 					) : (
@@ -93,7 +94,10 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 					)}
 					<p className="auth-alternative">
 						{login ? "New around here?" : "Already have an account?"}{" "}
-						<Link to={login ? "/register" : "/login"}>
+						<Link
+							to={login ? "/register" : "/login"}
+							search={{ redirect: destination }}
+						>
 							{login ? "Create an account" : "Welcome back"}{" "}
 							<span aria-hidden="true">↗</span>
 						</Link>

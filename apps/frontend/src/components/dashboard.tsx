@@ -1,33 +1,18 @@
-import {
-	useInfiniteQuery,
-	useMutation,
-	useQuery,
-	useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import {
-	ArrowDown,
-	ArrowUpRight,
-	ChevronDown,
-	LayoutGrid,
-	Plus,
-	Users,
-	X,
-} from "lucide-react";
+import { ArrowUpRight, Plus, X } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
 	type Board,
-	type BoardDetail,
 	type BoardListItem,
-	type BoardPage,
 	type CreateBoard,
-	type CurrentUser,
 	createApiClient,
 	validateBoard,
 } from "../lib/api";
+import { useBoards, useMe, useRefresh } from "../lib/workspace";
 import { useIdentity } from "./providers";
-import { SiteHeader } from "./site-header";
-import { Button, ErrorNotice, Footer, Loading } from "./ui";
+import { Button, ErrorNotice, Loading } from "./ui";
+import { AppShell } from "./workspace/app-shell";
 export function CreateBoardForm({
 	onClose,
 	onCreated,
@@ -137,245 +122,125 @@ export function CreateBoardForm({
 	);
 }
 export function BoardCard({ board }: { board: BoardListItem }) {
-	const { getToken, userId } = useIdentity();
-	const [expanded, setExpanded] = useState(false);
-	const detail = useQuery({
-		queryKey: ["board", userId, board.id],
-		queryFn: ({ signal }) =>
-			createApiClient(getToken)<BoardDetail>(
-				`/boards/${encodeURIComponent(board.id)}`,
-				{ signal },
-			),
-		enabled: expanded,
-	});
 	return (
 		<article
 			className="workspace-board"
 			style={{ borderTopColor: board.color }}
 		>
-			<div className="workspace-board-top">
-				<span className="board-symbol" style={{ color: board.color }}>
-					<LayoutGrid size={23} />
-				</span>
-				<span className="role-badge">{board.role.toLowerCase()}</span>
-			</div>
+			<span className="role-badge">{board.role.toLowerCase()}</span>
 			<h3>{board.title}</h3>
 			<p className="board-description">
 				{board.description || "A little space for your next good idea."}
 			</p>
 			<div className="board-stats">
-				<span>
-					<LayoutGrid size={14} />
-					{board.taskCount} {board.taskCount === 1 ? "task" : "tasks"}
-				</span>
-				<span>
-					<Users size={14} />
-					{board.memberCount} {board.memberCount === 1 ? "member" : "members"}
-				</span>
+				<span>{board.taskCount} tasks</span>
+				<span>{board.memberCount} members</span>
 			</div>
-			<button
-				type="button"
+			<Link
 				className="board-expand"
-				aria-expanded={expanded}
-				aria-controls={`detail-${board.id}`}
-				onClick={() => setExpanded(!expanded)}
+				to="/board/$boardId"
+				params={{ boardId: board.id }}
 			>
-				{expanded ? "Close overview" : "Board overview"}
-				<ChevronDown size={17} className={expanded ? "rotate-180" : ""} />
-			</button>
-			{expanded && (
-				<div id={`detail-${board.id}`} className="board-detail">
-					{detail.isPending ? (
-						<Loading>Loading overview…</Loading>
-					) : detail.error ? (
-						<ErrorNotice
-							error={detail.error}
-							retry={() => void detail.refetch()}
-						/>
-					) : (
-						<>
-							<h4>YOUR COLUMNS</h4>
-							<ul>
-								{detail.data.columns.map((column) => (
-									<li key={column.id}>
-										<span className="status-dot" />
-										{column.title}
-									</li>
-								))}
-							</ul>
-							<p>
-								{detail.data.members.length}{" "}
-								{detail.data.members.length === 1
-									? "person has"
-									: "people have"}{" "}
-								a place on this board.
-							</p>
-							<p className="detail-note">
-								This is your board overview. Task editing is coming in the next
-								release.
-							</p>
-						</>
-					)}
-				</div>
-			)}
+				Open board <ArrowUpRight size={17} />
+			</Link>
 		</article>
 	);
 }
 export function Dashboard() {
-	const { isLoaded, userId, getToken } = useIdentity();
-	if (!isLoaded) return <Loading />;
-	if (!userId)
-		return (
-			<>
-				<SiteHeader />
-				<main id="main-content" className="page-container session-ended">
-					<h1>Your workspace is waiting.</h1>
-					<p>Sign in to pick up where you left off.</p>
-					<Link
-						to="/login"
-						search={{ redirect: "/dashboard" }}
-						className="button"
-					>
-						Sign in <ArrowUpRight size={17} />
-					</Link>
-				</main>
-			</>
-		);
-	return <Workspace key={userId} userId={userId} getToken={getToken} />;
+	return (
+		<AppShell>
+			<DashboardContent />
+		</AppShell>
+	);
 }
-function Workspace({
-	userId,
-	getToken,
-}: {
-	userId: string;
-	getToken: () => Promise<string | null>;
-}) {
-	const client = useQueryClient();
+function DashboardContent() {
+	const user = useMe();
+	const boards = useBoards();
 	const [creating, setCreating] = useState(false);
-	const [notice, setNotice] = useState("");
-	const createButton = useRef<HTMLButtonElement>(null);
-	const api = createApiClient(getToken);
-	const user = useQuery({
-		queryKey: ["user", userId],
-		queryFn: ({ signal }) => api<CurrentUser>("/users/me", { signal }),
-	});
-	const boards = useInfiniteQuery({
-		queryKey: ["boards", userId],
-		initialPageParam: null as string | null,
-		queryFn: ({ pageParam, signal }) =>
-			api<BoardPage>(
-				`/boards?limit=12${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ""}`,
-				{ signal },
-			),
-		getNextPageParam: (last) => last.nextCursor ?? undefined,
-		enabled: user.isSuccess,
-	});
-	function closeForm() {
-		setCreating(false);
-		createButton.current?.focus();
-	}
-	async function created(board: Board) {
-		setNotice(`“${board.title}” is ready. A little space for something good.`);
-		closeForm();
-		await client.invalidateQueries({ queryKey: ["boards", userId] });
-	}
-	const items = boards.data?.pages.flatMap((page) => page.boards) || [];
+	const [search, setSearch] = useState("");
+	const [archived, setArchived] = useState(false);
+	const refresh = useRefresh();
 	return (
 		<>
-			<SiteHeader workspace />
-			<main id="main-content" className="workspace page-container">
-				<div className="workspace-heading">
-					<div>
-						<span className="eyebrow">YOUR CORNER OF POSSIBILITY</span>
-						<h1>
-							{user.data
-								? `Hello, ${user.data.name.split(" ")[0] || "there"}.`
-								: "Your workspace."}
-							<br />
-							<span className="muted-serif">What’s next?</span>
-						</h1>
-						<p>A little clarity for everything you’re working toward.</p>
+			<div className="workspace-page-heading">
+				<div>
+					<span className="eyebrow">YOUR CORNER OF POSSIBILITY</span>
+					<h1>
+						Hello, {user.data?.name?.split(" ")[0] || "there"}.<br />
+						<span className="muted-serif">What’s next?</span>
+					</h1>
+					<p>A little clarity for everything you’re working toward.</p>
+				</div>
+				<Button onClick={() => setCreating(true)} disabled={creating}>
+					<Plus size={18} />
+					New board
+				</Button>
+			</div>
+			{creating && (
+				<CreateBoardForm
+					onClose={() => setCreating(false)}
+					onCreated={() => {
+						setCreating(false);
+						void refresh();
+					}}
+				/>
+			)}
+			<div className="filter-bar">
+				<input
+					aria-label="Search boards"
+					placeholder="Find a board…"
+					value={search}
+					onChange={(e) => setSearch(e.target.value)}
+				/>
+				<Button
+					className={!archived ? "" : "button-secondary"}
+					aria-pressed={!archived}
+					onClick={() => setArchived(false)}
+				>
+					Active boards
+				</Button>
+				<Button
+					className={archived ? "" : "button-secondary"}
+					aria-pressed={archived}
+					onClick={() => setArchived(true)}
+				>
+					Archived boards
+				</Button>
+			</div>
+			{boards.isPending && <Loading />}
+			{boards.error && (
+				<ErrorNotice error={boards.error} retry={() => void boards.refetch()} />
+			)}
+			<div className="boards-grid">
+				{boards.data
+					?.filter(
+						(b) =>
+							!!b.archivedAt === archived &&
+							b.title.toLowerCase().includes(search.toLowerCase()),
+					)
+					.map((b) => (
+						<BoardCard key={b.id} board={b} />
+					))}
+			</div>
+			{boards.isSuccess &&
+				!boards.data.some(
+					(b) =>
+						!!b.archivedAt === archived &&
+						b.title.toLowerCase().includes(search.toLowerCase()),
+				) && (
+					<div className="empty-state">
+						<h3>
+							{archived
+								? "No archived boards here."
+								: "Good things start with a blank board."}
+						</h3>
+						<p>
+							{search
+								? "Try a different search."
+								: "Give your next idea a place to grow."}
+						</p>
 					</div>
-					<Button
-						ref={createButton}
-						onClick={() => {
-							setCreating(true);
-							setNotice("");
-						}}
-						disabled={!user.isSuccess || creating}
-					>
-						<Plus size={18} />
-						New board
-					</Button>
-				</div>
-				<div role="status" className={notice ? "success-notice" : "sr-only"}>
-					{notice}
-				</div>
-				{creating && (
-					<CreateBoardForm onClose={closeForm} onCreated={created} />
 				)}
-				<section aria-labelledby="boards-heading">
-					<div className="boards-heading">
-						<h2 id="boards-heading">Your boards</h2>
-						<span>THE BIG PICTURE</span>
-					</div>
-					{user.isPending ? (
-						<Loading>Finding your workspace…</Loading>
-					) : user.error ? (
-						<ErrorNotice error={user.error} retry={() => void user.refetch()} />
-					) : (
-						<>
-							{boards.isPending && <Loading>Gathering your boards…</Loading>}
-							{boards.error && (
-								<ErrorNotice
-									error={boards.error}
-									retry={() => void boards.refetch()}
-								/>
-							)}{" "}
-							{boards.isSuccess && items.length === 0 && (
-								<div className="empty-state">
-									<span className="empty-icon">
-										<LayoutGrid size={34} strokeWidth={1.2} />
-									</span>
-									<h3>Good things start with a blank board.</h3>
-									<p>
-										Give that project you’ve been thinking about
-										<br />a little room to take shape.
-									</p>
-									<Button
-										className="button-secondary"
-										onClick={() => setCreating(true)}
-										disabled={creating}
-									>
-										<Plus size={17} />
-										Create your first board
-									</Button>
-								</div>
-							)}
-							<div className="boards-grid">
-								{items.map((board) => (
-									<BoardCard key={board.id} board={board} />
-								))}
-							</div>
-							{boards.hasNextPage && (
-								<div className="load-more">
-									<Button
-										className="button-secondary"
-										disabled={boards.isFetchingNextPage}
-										onClick={() => void boards.fetchNextPage()}
-									>
-										{boards.isFetchingNextPage
-											? "Loading…"
-											: "More possibilities"}
-										<ArrowDown size={16} />
-									</Button>
-								</div>
-							)}
-						</>
-					)}
-				</section>
-			</main>
-			<Footer />
 		</>
 	);
 }

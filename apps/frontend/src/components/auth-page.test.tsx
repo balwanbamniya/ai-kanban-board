@@ -3,7 +3,10 @@ import { afterEach, expect, it, vi } from "vitest";
 import { renderPage } from "../test/render";
 import { AuthPage } from "./auth-page";
 
-vi.mock("../lib/auth", () => ({ authConfigured: true }));
+vi.mock("../lib/auth", async (original) => ({
+	...(await original<typeof import("../lib/auth")>()),
+	authConfigured: true,
+}));
 vi.mock("@clerk/tanstack-react-start", () => ({
 	SignIn: ({
 		routing,

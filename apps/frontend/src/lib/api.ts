@@ -27,14 +27,7 @@ export interface BoardPage {
 }
 export interface BoardDetail {
 	board: BoardListItem;
-	columns: {
-		id: string;
-		title: string;
-		sortKey: string;
-		version: number;
-		createdAt: string;
-		updatedAt: string;
-	}[];
+	columns: Column[];
 	members: {
 		id: string;
 		name: string;
@@ -66,7 +59,11 @@ export function createApiClient(
 ) {
 	return async function request<T>(
 		path: string,
-		options: { signal?: AbortSignal; body?: CreateBoard } = {},
+		options: {
+			signal?: AbortSignal;
+			body?: unknown;
+			method?: "GET" | "POST" | "PATCH" | "DELETE";
+		} = {},
 	): Promise<T> {
 		const token = await getToken();
 		if (!token)
@@ -77,7 +74,7 @@ export function createApiClient(
 		let response: Response;
 		try {
 			response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
-				method: options.body ? "POST" : "GET",
+				method: options.method ?? (options.body ? "POST" : "GET"),
 				cache: "no-store",
 				headers: {
 					Authorization: `Bearer ${token}`,
@@ -133,4 +130,76 @@ export function validateBoard(input: CreateBoard): string | null {
 	if (!/^#[0-9a-f]{6}$/i.test(input.color))
 		return "Choose a valid board color.";
 	return null;
+}
+
+export interface Column {
+	id: string;
+	title: string;
+	sortKey: string;
+	version: number;
+	isCompleted: boolean;
+	taskCount: number;
+	createdAt: string;
+	updatedAt: string;
+}
+export interface Task {
+	id: string;
+	boardId: string;
+	columnId: string;
+	title: string;
+	description: string | null;
+	assigneeId: string | null;
+	assignee: {
+		id: string;
+		name: string;
+		email: string | null;
+		avatarUrl: string | null;
+	} | null;
+	parentTaskId: string | null;
+	priority: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+	dueDate: string | null;
+	version: number;
+	sortKey: string;
+	_count: { subtasks: number };
+	column: {
+		id: string;
+		title: string;
+		isCompleted: boolean;
+		board: {
+			id: string;
+			title: string;
+			color: string;
+			archivedAt: string | null;
+		};
+	};
+}
+export interface TaskPage {
+	tasks: Task[];
+	nextCursor: string | null;
+}
+export interface AiRun {
+	id: string;
+	boardId: string;
+	status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+	operationKind: "TASK_GENERATION" | "BOARD_SUMMARY";
+	createdAt: string;
+	errorMessage: string | null;
+	output: {
+		tasks?: {
+			title: string;
+			description: string;
+			priority: Task["priority"];
+		}[];
+		overview?: string;
+		blockers?: string[];
+		nextActions?: string[];
+	} | null;
+	suggestions: { suggestionIndex: number; taskId: string }[];
+}
+export interface Invitation {
+	id: string;
+	email: string;
+	role: Board["role"];
+	status: string;
+	expiresAt: string;
 }
