@@ -8,7 +8,7 @@ services:
     buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @repo/api generate && pnpm --filter @repo/api build
     # Free plan has no preDeployCommand, so migrate on boot (idempotent).
     startCommand: pnpm --filter @repo/api db:migrate:deploy && pnpm --filter @repo/api start:prod
-    healthCheckPath: /health/live
+    healthCheckPath: /api/v1/health/live
     envVars:
       - { key: NODE_VERSION, value: 24.20.0 }
       - { key: NODE_ENV, value: production }
