@@ -1,7 +1,4 @@
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
+import type { NodeSDK } from "@opentelemetry/sdk-node";
 
 export interface TelemetryOptions {
 	enabled: boolean;
@@ -10,10 +7,23 @@ export interface TelemetryOptions {
 
 let telemetry: NodeSDK | undefined;
 
-export function startTelemetry(options: TelemetryOptions): void {
+// OpenTelemetry packages are heavy; load them only when telemetry is enabled.
+export async function startTelemetry(options: TelemetryOptions): Promise<void> {
 	if (!options.enabled || telemetry) {
 		return;
 	}
+
+	const [
+		{ getNodeAutoInstrumentations },
+		{ resourceFromAttributes },
+		{ NodeSDK },
+		{ ATTR_SERVICE_NAME },
+	] = await Promise.all([
+		import("@opentelemetry/auto-instrumentations-node"),
+		import("@opentelemetry/resources"),
+		import("@opentelemetry/sdk-node"),
+		import("@opentelemetry/semantic-conventions"),
+	]);
 
 	telemetry = new NodeSDK({
 		instrumentations: [getNodeAutoInstrumentations()],

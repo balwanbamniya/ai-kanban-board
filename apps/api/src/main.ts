@@ -13,7 +13,7 @@ loadEnvironment({
 
 try {
 	const telemetryConfig = readTelemetryEnvironment(process.env);
-	startTelemetry({
+	await startTelemetry({
 		enabled: telemetryConfig.OTEL_ENABLED,
 		serviceName: telemetryConfig.OTEL_SERVICE_NAME,
 	});

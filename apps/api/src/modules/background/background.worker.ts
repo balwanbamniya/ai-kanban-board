@@ -20,6 +20,8 @@ import { RealtimeGateway } from "../realtime/realtime.gateway.js";
 
 type Claim = { id: string; attempts: number; leaseToken: string };
 const MAX_ATTEMPTS = 3;
+const POLL_INTERVAL_MS = 1000;
+const MAX_BACKOFF_MS = 60_000;
 @Injectable()
 export class BackgroundWorker
 	implements OnApplicationBootstrap, OnModuleDestroy
@@ -27,6 +29,7 @@ export class BackgroundWorker
 	private readonly logger = new Logger(BackgroundWorker.name);
 	private readonly timers: Partial<Record<"ai" | "outbox", NodeJS.Timeout>> =
 		{};
+	private readonly failures = { ai: 0, outbox: 0 };
 	private readonly active = new Set<Promise<void>>();
 	private stopped = false;
 	constructor(
@@ -45,19 +48,28 @@ export class BackgroundWorker
 	private schedule(kind: "ai" | "outbox"): void {
 		if (this.stopped) return;
 		this.timers[kind] = setTimeout(() => {
-			const work = (kind === "ai" ? this.processAi() : this.processOutbox())
-				.catch(() => {
-					this.logger.error({
-						message: "Background polling failed",
-						queue: kind,
-					});
+			const work: Promise<void> = (
+				kind === "ai" ? this.processAi() : this.processOutbox()
+			)
+				.then(() => {
+					this.failures[kind] = 0;
+				})
+				.catch((error: unknown) => {
+					// Log the first failure of a streak, then back off silently.
+					if (this.failures[kind]++ === 0) {
+						this.logger.error({
+							message: "Background polling failed",
+							queue: kind,
+							reason: error instanceof Error ? error.message : String(error),
+						});
+					}
 				})
 				.finally(() => {
 					this.active.delete(work);
 					this.schedule(kind);
 				});
 			this.active.add(work);
-		}, 1000);
+		}, Math.min(POLL_INTERVAL_MS * 2 ** this.failures[kind], MAX_BACKOFF_MS));
 		this.timers[kind]?.unref();
 	}
 	async onModuleDestroy(): Promise<void> {

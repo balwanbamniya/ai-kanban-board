@@ -59,6 +59,9 @@ export function createHttpLogger({
 			service: serviceName,
 		},
 		genReqId: getRequestId,
+		autoLogging: {
+			ignore: (req) => req.url?.startsWith("/health") ?? false,
+		},
 		redact: {
 			paths: [
 				"req.headers.authorization",
